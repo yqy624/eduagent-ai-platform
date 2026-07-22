@@ -21,9 +21,15 @@ pip install -r requirements.txt
 cp .env.example .env
 # 编辑 .env 填入数据库密码和 API Key
 
-# 3. 启动
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 3. 启动（注意清除 PYTHONPATH 避免冲突）
+PYTHONPATH="" .venv/Scripts/python run.py
+
+# 或者直接：uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+> ⚠️ 如果使用 `uvicorn` 命令启动，需要先清除 PYTHONPATH 环境变量：  
+> Windows PowerShell: `$env:PYTHONPATH=""`  
+> Git Bash: `PYTHONPATH="" uvicorn app.main:app --reload`
 
 ## 项目结构
 
