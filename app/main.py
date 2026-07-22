@@ -1,7 +1,6 @@
 """FastAPI 应用入口"""
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -33,9 +32,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# 静态文件（原 Java 项目前端页面）
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
 @app.get("/api/health")

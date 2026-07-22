@@ -12,4 +12,4 @@ sys.path = [project_sp] + [p for p in sys.path if p != project_sp and "hermes" n
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8001, reload=False)
