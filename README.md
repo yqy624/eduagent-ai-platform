@@ -37,6 +37,17 @@
 - 教师确认后才写回正式成绩（Human-in-the-loop）
 - 评语记忆复用与教学讲评生成
 
+## 当前基线状态
+
+项目已经具备 FastAPI、三角色业务接口和 AI 工作流骨架，但尚未完成全部需求验收。
+当前阶段先保证编码、依赖、配置和启动入口可审计，再继续修复业务接口和 AI 闭环。
+
+已知限制：
+
+- 完整运行需要 MySQL、Redis 和至少一个可用的 LLM 或本地 Ollama。
+- `python scripts/check_baseline.py` 会区分代码错误、核心依赖缺失和可选 AI 依赖缺失。
+- RAG、学习计划 Agent、批改 Agent、通知和部分管理员接口仍在后续阶段完善。
+
 ## 快速启动
 
 ```bash
@@ -44,24 +55,43 @@
 git clone <repo-url> edu-ai-platform
 cd edu-ai-platform
 
-# 2. 安装依赖
-pip install -r requirements.txt
+# 2. 创建并激活虚拟环境（Windows PowerShell）
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1
 
-# 3. 配置环境变量
+# 3. 安装依赖
+python -m pip install --upgrade pip
+python -m pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+
+# 4. 配置环境变量
 cp .env.example .env
 # 编辑 .env 填入 MySQL 密码和 LLM API Key
 
-# 4. 启动服务
-PYTHONPATH="" .venv/Scripts/python run.py
+# 5. 执行基线检查
+python scripts/check_baseline.py
+
+# 6. 启动服务
+python run.py
 # 访问 http://localhost:8001/docs 查看 API 文档
 ```
+
+Linux/macOS 可将虚拟环境路径替换为 `.venv/bin/python`，启动命令仍然是
+`python run.py` 或 `.venv/bin/python run.py`。
 
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `DB_PASSWORD` | `change-me` | MySQL 密码 |
-| `JWT_SECRET` | 内置默认值 | JWT 签名密钥，生产环境必须修改 |
+| `APP_ENV` | `development` | 运行环境 |
+| `LOG_LEVEL` | `INFO` | 日志级别 |
+| `CORS_ORIGINS` | 本地前端地址 | 允许的前端来源，逗号分隔 |
+| `REDIS_HOST` | `localhost` | Redis 地址 |
+| `JWT_SECRET` | 示例值 | JWT 签名密钥，生产环境必须修改 |
+| `UPLOAD_DIR` | `uploads` | 本地上传目录 |
+| `MAX_UPLOAD_SIZE_MB` | `20` | 单文件大小上限 |
+| `AI_ENABLED` | `true` | 是否加载 AI 功能 |
+| `VECTOR_STORE` | `chroma` | 向量存储实现 |
 | `OPENAI_API_KEY` | - | OpenAI API Key（可选） |
 | `DASHSCOPE_API_KEY` | - | 通义千问 API Key（可选） |
 | `ANTHROPIC_API_KEY` | - | Claude API Key（可选） |
@@ -168,17 +198,17 @@ User Input → [收集画像] → [薄弱分析] → [检索资料] → [规划�
 
 | 评测项 | 指标 | 状态 |
 |--------|------|------|
-| RAG 问答 | 引用覆盖率、拒答准确率 | - |
-| 批改建议 | 平均误差、采纳率 | - |
-| 学习计划 | 可执行性、资料覆盖 | - |
+| RAG 问答 | 引用覆盖率、拒答准确率 | 未完成基线评测 |
+| 批改建议 | 平均误差、采纳率 | 未完成基线评测 |
+| 学习计划 | 可执行性、资料覆盖 | 未完成基线评测 |
 
 ## 开发计划
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| Phase 0 | 工程修复、README、配置统一 | ✅ |
-| Phase 1 | 认证 + 三角色核心业务接口 | ✅ |
-| Phase 2 | 文件与课程知识库 | 📝 |
-| Phase 3 | 学生学习 Agent | 📝 |
-| Phase 4 | 教师批改 Agent | 📝 |
-| Phase 5 | 评测与包装 | 📝 |
+| Phase 0 | 基线、编码、依赖和配置统一 | 进行中 |
+| Phase 1 | 认证 + 三角色核心业务接口 | 部分完成 |
+| Phase 2 | 文件与课程知识库 | 未开始 |
+| Phase 3 | 学生学习 Agent | 骨架已存在，未完成 |
+| Phase 4 | 教师批改 Agent | 骨架已存在，未完成 |
+| Phase 5 | 评测与交付 | 未开始 |

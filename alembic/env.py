@@ -10,10 +10,15 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all models so Alembic can detect them
+from app.config import settings
 from app.database import Base
 from app.models import *  # noqa
 
 target_metadata = Base.metadata
+
+# 不把数据库账号密码写入 alembic.ini。ConfigParser 使用百分号插值，
+# 因此动态写入时需要先转义密码中的百分号。
+config.set_main_option("sqlalchemy.url", settings.database_url_sync.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

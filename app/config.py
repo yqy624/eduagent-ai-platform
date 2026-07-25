@@ -1,12 +1,25 @@
-"""应用配置管理"""
-from pydantic_settings import BaseSettings
+"""应用配置管理。
+
+所有可变配置从环境变量读取，.env 仅用于本地开发。
+"""
+
+from pathlib import Path
 from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
     # Server
+    app_env: str = "development"
     server_host: str = "0.0.0.0"
-    server_port: int = 8000
+    server_port: int = 8001
+    log_level: str = "INFO"
+    cors_origins: str = "http://localhost:8001,http://127.0.0.1:8001"
 
     # Database
     db_host: str = "localhost"
@@ -40,6 +53,16 @@ class Settings(BaseSettings):
     minio_secret_key: Optional[str] = "minioadmin"
     minio_bucket: str = "education-files"
 
+    # Local file storage
+    upload_dir: str = "uploads"
+    max_upload_size_mb: int = Field(default=20, ge=1, le=1024)
+
+    # AI and vector store
+    ai_enabled: bool = True
+    vector_store: str = "faiss"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    chroma_persist_dir: str = "data/chroma"
+
     # LLM API Keys
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o"
@@ -52,7 +75,28 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = ""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """返回可直接交给 CORSMiddleware 的来源列表。"""
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def upload_path(self) -> Path:
+        """返回相对于项目根目录解析后的上传目录。"""
+        path = Path(self.upload_dir)
+        return path if path.is_absolute() else PROJECT_ROOT / path
+
+    @property
+    def chroma_path(self) -> Path:
+        path = Path(self.chroma_persist_dir)
+        return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 settings = Settings()
