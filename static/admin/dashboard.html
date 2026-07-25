@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员工作台</title>
+  <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <script src="/static/js/echarts.min.js?v=20260705"></script>
+  <link href="/static/css/app.css?v=20260705" rel="stylesheet">
+  <style>
+    .quick-action-grid,.monitor-metric-grid,.todo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+    .quick-action-btn{display:flex;align-items:center;gap:10px;justify-content:center;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--bg-card);box-shadow:var(--shadow);color:var(--text-main);font-weight:600}
+    .quick-action-btn:hover{transform:translateY(-1px);border-color:var(--accent);color:var(--accent)}
+    .todo-item,.monitor-mini-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+    .todo-item{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer}
+    .course-batch-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .monitor-mini-card.alert{border-color:#ef4444;background:rgba(239,68,68,.06)}
+    .metric-value.alert{color:#dc2626;font-weight:700}
+    .rank-list{display:flex;flex-direction:column;gap:12px}
+    .rank-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg-soft)}
+    .toolbar.flex-wrap{display:flex;flex-wrap:wrap;gap:12px}
+    .modal .form-text{font-size:12px}
+    .overview-summary-card{grid-column:1 / -1}
+    .overview-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  </style>
+</head>
+<body class="page-shell" data-role="admin">
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="d-flex align-items-center gap-2 mb-4">
+      <div class="brand-mark"><i class="fa-solid fa-shield-halved"></i></div>
+      <div>
+        <div class="fw-bold">管理员工作台</div>
+        <div class="small text-white-50">系统与用户管理中心</div>
+      </div>
+    </div>
+    <div class="nav-item active" data-tab="dashboard"><i class="fa-solid fa-chart-line"></i> 概览</div>
+    <div class="nav-item" data-tab="users"><i class="fa-solid fa-users"></i> 用户管理</div>
+    <div class="nav-item" data-tab="courses"><i class="fa-solid fa-book"></i> 课程管理</div>
+    <div class="nav-item" data-tab="logs"><i class="fa-solid fa-clock-rotate-left"></i> 审计日志</div>
+    <div class="nav-item" data-tab="monitor"><i class="fa-solid fa-heart-pulse"></i> 系统监控</div>
+  </aside>
+
+  <main class="main-area">
+    <div class="topbar mb-3">
+      <div>
+        <div class="fw-semibold" id="titleText">概览</div>
+        <div class="breadcrumb-bar p-0" id="breadcrumb"></div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <button id="themeToggle" class="btn btn-outline-secondary btn-sm" onclick="App.toggleTheme()"><i class="fa-solid fa-moon"></i></button>
+        <div class="notif-wrap">
+          <button class="notif-btn" onclick="App.toggleNotifPanel()"><i class="fa-regular fa-bell"></i><span class="notif-badge" id="notifBadge">0</span></button>
+          <div class="notif-panel" id="notifPanel">
+            <div class="notif-head d-flex justify-content-between"><span>通知中心</span><a href="javascript:;" onclick="App.markAllRead()">全部已读</a></div>
+            <div id="notifBody"></div>
+          </div>
+        </div>
+        <button class="btn btn-link p-0 text-decoration-none fw-semibold text-body" id="userName" type="button" onclick="openProfileModal()" title="个人主页">管理员</button>
+        <a href="javascript:App.logout()" class="logout-link text-decoration-none text-muted small" title="退出登录">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </a>
+      </div>
+    </div>
+
+    <section id="view-dashboard" class="view">
+      <div class="hero-banner mb-3">
+        <div class="eyebrow"><i class="fa-solid fa-gauge-high"></i> 系统概览</div>
+        <div class="title">欢迎回来，<span id="heroName">管理员</span></div>
+        <div class="desc">集中查看平台核心指标、待办事项和运行状态，快速完成管理操作。</div>
+      </div>
+      <div class="kpi-grid mb-3" id="kpiGrid"></div>
+      <div class="section-card mb-3">
+        <div class="section-head"><h5 class="mb-0">快捷操作</h5><span class="text-muted small">常用管理入口</span></div>
+        <div class="quick-action-grid" id="quickActionGrid"></div>
+      </div>
+      <div class="dashboard-chart-grid">
+        <div class="section-card dashboard-card-main"><div class="section-head"><h5 class="mb-0">近 7 天访问量</h5></div><div id="chartVisits" style="height:320px"></div></div>
+        <div class="section-card dashboard-card-side"><div class="section-head"><h5 class="mb-0">用户角色分布</h5></div><div id="chartRoles" style="height:320px"></div></div>
+        <div class="section-card dashboard-card-side"><div class="section-head"><h5 class="mb-0">热门课程 Top5</h5></div><div id="topCoursesRank" class="rank-list"></div></div>
+        <div class="section-card dashboard-card-main"><div class="section-head"><h5 class="mb-0">活动面板</h5><button class="btn btn-primary btn-sm" onclick="openActivityModal()">发布活动</button></div><div id="activityPanel"></div></div>
+        <div class="section-card dashboard-card-side"><div class="section-head"><h5 class="mb-0">待办提醒</h5></div><div class="todo-grid" id="todoGrid"></div></div>
+      </div>
+      <div class="overview-grid mt-3" id="overviewExtra"></div>
+    </section>
+
+    <section id="view-users" class="view d-none">
+      <div class="section-card">
+        <div class="section-head"><h5 class="mb-0">用户管理</h5><button class="btn btn-primary btn-sm" onclick="openUserForm()">新增用户</button></div>
+        <div class="toolbar mb-3">
+          <input class="form-control" id="userKeyword" placeholder="搜索用户名 / 姓名 / 邮箱">
+          <select class="form-select" id="userRole"><option value="">全部角色</option><option value="ADMIN">管理员</option><option value="TEACHER">教师</option><option value="STUDENT">学生</option></select>
+          <button class="btn btn-outline-primary" onclick="searchUsers()">查询</button>
+        </div>
+        <div id="userBox"></div>
+      </div>
+    </section>
+
+    <section id="view-courses" class="view d-none">
+      <div class="section-card">
+        <div class="section-head"><h5 class="mb-0">课程管理</h5><span class="text-muted small">管理员可编辑课程、调整选课与批量处理</span></div>
+        <div class="course-batch-bar">
+          <div class="toolbar flex-wrap mb-0">
+            <input class="form-control" id="courseKeyword" placeholder="搜索课程名称 / 描述 / 教师">
+            <button class="btn btn-outline-primary" onclick="loadCourses()">查询</button>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="batchHideCourses()"><i class="fa-solid fa-eye-slash"></i> 批量下架</button>
+            <button class="btn btn-outline-danger btn-sm" onclick="batchDeleteCourses()"><i class="fa-solid fa-trash"></i> 批量删除</button>
+          </div>
+        </div>
+        <div id="courseBox"></div>
+      </div>
+    </section>
+
+    <section id="view-logs" class="view d-none">
+      <div class="section-card">
+        <div class="section-head"><h5 class="mb-0">审计日志</h5></div>
+        <div id="logBox"></div>
+      </div>
+    </section>
+
+    <section id="view-monitor" class="view d-none">
+      <div class="section-card mb-3">
+        <div class="section-head"><h5 class="mb-0">系统监控</h5><button class="btn btn-primary btn-sm" onclick="runHealthCheck()"><i class="fa-solid fa-stethoscope"></i> 一键健康检查</button></div>
+        <div id="monitorBox"></div>
+      </div>
+      <div class="monitor-panel-grid">
+        <div class="section-card"><div class="section-head"><h5 class="mb-0">底层资源监控</h5></div><div id="monitorResourceChart" style="height:260px"></div></div>
+        <div class="section-card"><div class="section-head"><h5 class="mb-0">应用服务监控</h5></div><div id="monitorServiceChart" style="height:260px"></div></div>
+        <div class="section-card"><div class="section-head"><h5 class="mb-0">错误类型分布</h5></div><div id="monitorErrorChart" style="height:260px"></div></div>
+        <div class="monitor-stack">
+          <div class="section-card"><div class="section-head"><h5 class="mb-0">告警中心</h5></div><div id="alertBox"></div></div>
+          <div class="section-card"><div class="section-head"><h5 class="mb-0">健康体检报告</h5></div><div id="healthReportBox"></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal fade" id="profileModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">个人主页</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label class="form-label" for="profileUsername">用户名</label>
+        <input id="profileUsername" class="form-control mb-2" disabled>
+        <label class="form-label" for="profileDisplayName">姓名</label>
+        <input id="profileDisplayName" class="form-control mb-2" maxlength="50" placeholder="请输入姓名">
+        <label class="form-label" for="profileEmail">邮箱</label>
+        <input id="profileEmail" type="email" class="form-control mb-2" maxlength="100" placeholder="请输入邮箱">
+        <label class="form-label" for="profilePassword">新密码</label>
+        <input id="profilePassword" type="password" class="form-control" placeholder="不修改请留空">
+        <div class="form-text">密码留空时不会修改原密码。</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="saveProfile()">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="userModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">新增用户</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input id="newUsername" class="form-control mb-2" placeholder="用户名">
+        <input id="newDisplayName" class="form-control mb-2" placeholder="显示名称">
+        <input id="newEmail" class="form-control mb-2" placeholder="邮箱">
+        <input id="newPassword" type="password" class="form-control mb-2" placeholder="密码">
+        <select id="newRole" class="form-select"><option value="ADMIN">管理员</option><option value="TEACHER">教师</option><option value="STUDENT">学生</option></select>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="createUser()">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="courseEditModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">编辑课程信息</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body row g-3">
+        <input type="hidden" id="editCourseId">
+        <div class="col-md-6"><label class="form-label">课程名称</label><input id="editCourseName" class="form-control"></div>
+        <div class="col-md-6"><label class="form-label">授课教师</label><select id="editCourseTeacher" class="form-select"></select></div>
+        <div class="col-md-6"><label class="form-label">开课时间</label><input id="editCourseSchedule" class="form-control" placeholder="例如 Mon 10:00-12:00"></div>
+        <div class="col-md-3"><label class="form-label">课程容量</label><input id="editCourseMaxStudents" type="number" class="form-control"></div>
+        <div class="col-md-3"><label class="form-label">学分</label><input id="editCourseCredits" type="number" class="form-control"></div>
+        <div class="col-md-6"><label class="form-label">课程分类</label><input id="editCourseCategory" class="form-control" placeholder="例如 编程基础 / 数据分析"></div>
+        <div class="col-12"><label class="form-label">课程简介</label><textarea id="editCourseDescription" class="form-control" rows="4"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="saveCourseEdit()">保存修改</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="enrollmentModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">调整选课</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="enrollmentCourseId">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4"><label class="form-label">课程容量</label><input id="enrollmentMaxStudents" type="number" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">新增学生</label><select id="enrollmentAddStudents" class="form-select" multiple size="8"></select><div class="form-text">按住 Ctrl/Command 可多选</div></div>
+          <div class="col-md-4"><label class="form-label">移除已选学生</label><select id="enrollmentRemoveStudents" class="form-select" multiple size="8"></select></div>
+        </div>
+        <div class="section-card p-3 border-0 shadow-none" style="background:var(--bg-soft)">
+          <div class="section-head mb-2"><h6 class="mb-0">当前已选学生</h6></div>
+          <div id="enrollmentStudentTable"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="saveEnrollmentAdjust()">保存调整</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="activityModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="activityModalTitle">发布活动</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body row g-3">
+        <input type="hidden" id="activityId">
+        <div class="col-md-8"><label class="form-label">活动标题</label><input id="activityTitle" class="form-control" placeholder="请输入活动标题"></div>
+        <div class="col-md-4"><label class="form-label">受众</label><select id="activityAudience" class="form-select"><option value="ALL">全部师生</option><option value="TEACHERS">仅教师</option><option value="STUDENTS">仅学生</option></select></div>
+        <div class="col-12"><label class="form-label">活动内容</label><textarea id="activityContent" class="form-control" rows="5" placeholder="请输入要展示在教师端和学生端首页的活动内容"></textarea></div>
+        <div class="col-12"><label class="form-label">跳转链接（可选）</label><input id="activityLink" class="form-control" placeholder="例如 /student/dashboard.html"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="saveActivity()">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js?v=20260705"></script>
+<script>
+window.TOKEN = new URLSearchParams(location.search).get("token") || localStorage.getItem("token") || "";
+if (!TOKEN) location.href = "/login.html";
+App.initTheme();
+App.initNotifications(TOKEN);
+App.setBreadcrumb(["管理员工作台", "概览"]);
+
+var currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+var displayName = currentUser.displayName || currentUser.username || localStorage.getItem("displayName") || "管理员";
+document.getElementById("userName").textContent = displayName;
+document.getElementById("heroName").textContent = displayName;
+
+var charts = {};
+var currentDashboard = null;
+var currentCoursePage = [];
+var teacherOptions = [];
+var userPage = 1;
+var userPageSize = 10;
+
+var tabs = Array.from(document.querySelectorAll(".nav-item"));
+tabs.forEach(function(el) { el.addEventListener("click", function() { switchTab(el.dataset.tab); }); });
+window.addEventListener("resize", function() { Object.keys(charts).forEach(function(key) { if (charts[key] && charts[key].resize) charts[key].resize(); }); });
+function hasEcharts() {
+  return typeof window.echarts !== "undefined";
+}
+function resizeVisibleCharts() {
+  requestAnimationFrame(function() {
+    ["chartVisits", "chartRoles", "monitorResourceChart", "monitorServiceChart", "monitorErrorChart"].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el || !hasEcharts()) return;
+      var chart = echarts.getInstanceByDom(el);
+      if (chart && chart.resize) chart.resize();
+    });
+  });
+}
+function parseApiErrorPayload(payload, fallback) {
+  if (!payload) return fallback;
+  if (typeof payload === "string") return payload;
+  return payload.message || payload.error || fallback;
+}
+
+function api(path, method, body) {
+  if (method === undefined) method = "GET";
+  return fetch("/api" + path, {
+    method: method,
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
+    body: body ? JSON.stringify(body) : null
+  }).then(function(res) {
+    var contentType = res.headers.get("content-type") || "";
+    return (contentType.indexOf("application/json") >= 0 ? res.json() : res.text()).then(function(payload) {
+      if (!res.ok) throw new Error(parseApiErrorPayload(payload, "请求失败"));
+      if (!payload || payload.code !== 200) throw new Error(parseApiErrorPayload(payload, "请求失败"));
+      return payload.data;
+    });
+  });
+}
+
+function openProfileModal() {
+  return api("/profile").then(function(profile) {
+    profileUsername.value = profile.username || "";
+    profileDisplayName.value = profile.displayName || "";
+    profileEmail.value = profile.email || "";
+    profilePassword.value = "";
+    new bootstrap.Modal(profileModal).show();
+  }).catch(function(err) { alert(err.message || "加载个人资料失败"); });
+}
+
+function saveProfile() {
+  var payload = {
+    displayName: profileDisplayName.value.trim(),
+    email: profileEmail.value.trim(),
+    newPassword: profilePassword.value.trim()
+  };
+  if (!payload.newPassword) delete payload.newPassword;
+  return api("/profile", "PUT", payload).then(function(profile) {
+    var name = profile.displayName || profile.username || "管理员";
+    localStorage.setItem("displayName", name);
+    document.getElementById("userName").textContent = name;
+    document.getElementById("heroName").textContent = name;
+    bootstrap.Modal.getInstance(profileModal).hide();
+    alert("个人资料已更新");
+  }).catch(function(err) { alert(err.message || "保存失败"); });
+}
+
+function switchTab(tab) {
+  tabs.forEach(function(x) { x.classList.toggle("active", x.dataset.tab === tab); });
+  document.querySelectorAll(".view").forEach(function(v) { v.classList.add("d-none"); });
+  document.getElementById("view-" + tab).classList.remove("d-none");
+  var title = { dashboard: "概览", users: "用户管理", courses: "课程管理", logs: "审计日志", monitor: "系统监控" }[tab] || "概览";
+  document.getElementById("titleText").textContent = title;
+  App.setBreadcrumb(["管理员工作台", title]);
+  if (tab === "dashboard") {
+    loadDashboard();
+    resizeVisibleCharts();
+  }
+  if (tab === "users") loadUsers();
+  if (tab === "courses") loadCourses();
+  if (tab === "logs") loadLogs();
+  if (tab === "monitor") {
+    loadMonitor();
+    resizeVisibleCharts();
+  }
+}
+
+function openUserForm() {
+  new bootstrap.Modal(document.getElementById("userModal")).show();
+}
+
+function createUser() {
+  return api("/admin/users", "POST", {
+    username: newUsername.value.trim(),
+    displayName: newDisplayName.value.trim(),
+    email: newEmail.value.trim(),
+    password: newPassword.value.trim(),
+    role: newRole.value
+  }).then(function() {
+    bootstrap.Modal.getInstance(document.getElementById("userModal")).hide();
+    loadUsers();
+    loadDashboard();
+  });
+}
+
+function renderEmptyPanel(title, desc, compact) {
+  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div></div></div>';
+}
+
+function renderActivityAudience(audience) {
+  return audience === 'TEACHERS' ? '教师' : audience === 'STUDENTS' ? '学生' : '全部师生';
+}
+
+function renderActivityStatus(status) {
+  return status === 'ARCHIVED' ? '已归档' : status === 'PUBLISHED' ? '已发布' : '草稿';
+}
+
+function renderActivityStatusClass(status) {
+  return status === 'ARCHIVED' ? 'bg-secondary bg-opacity-10 text-secondary' : status === 'PUBLISHED' ? 'bg-success bg-opacity-10 text-success' : 'bg-warning bg-opacity-10 text-warning';
+}
+
+function openActivityModal(activity) {
+  activityId.value = activity && activity.id ? activity.id : '';
+  activityTitle.value = activity && activity.title ? activity.title : '';
+  activityContent.value = activity && activity.content ? activity.content : '';
+  activityAudience.value = activity && activity.audience ? activity.audience : 'ALL';
+  activityLink.value = activity && activity.link ? activity.link : '';
+  activityModalTitle.textContent = activity && activity.id ? '编辑活动' : '发布活动';
+  new bootstrap.Modal(document.getElementById('activityModal')).show();
+}
+
+function saveActivity() {
+  var id = activityId.value;
+  var path = id ? '/admin/activities/' + id : '/admin/activities';
+  var method = id ? 'PUT' : 'POST';
+  return api(path, method, {
+    title: activityTitle.value.trim(),
+    content: activityContent.value.trim(),
+    audience: activityAudience.value,
+    link: activityLink.value.trim() || null
+  }).then(function() {
+    bootstrap.Modal.getInstance(document.getElementById('activityModal')).hide();
+    App.toast(id ? '活动已更新' : '活动已发布', 'success');
+    loadActivities();
+  }).catch(function(err) {
+    App.toast(err.message || '保存失败', 'danger');
+  });
+}
+
+function publishActivity() {
+  return saveActivity();
+}
+
+function deleteActivity(id) {
+  if (!confirm('确认删除该活动吗？')) return Promise.resolve();
+  return api('/admin/activities/' + id, 'DELETE').then(function() {
+    App.toast('活动已删除', 'success');
+    loadActivities();
+  }).catch(function(err) {
+    App.toast(err.message || '删除失败', 'danger');
+  });
+}
+
+function republishActivity(id) {
+  return api('/admin/activities/' + id + '/republish', 'POST').then(function() {
+    App.toast('活动已重新发布', 'success');
+    loadActivities();
+  }).catch(function(err) {
+    App.toast(err.message || '重新发布失败', 'danger');
+  });
+}
+
+function loadDashboard() {
+  return api("/admin/dashboard").then(function(data) {
+    currentDashboard = data;
+    renderDashboard(data);
+    resizeVisibleCharts();
+  }).catch(function(err) {
+    document.getElementById("kpiGrid").innerHTML = renderEmptyPanel('概览加载失败', err.message || '暂时无法加载管理员概览数据。', false);
+    document.getElementById("quickActionGrid").innerHTML = '';
+    document.getElementById("todoGrid").innerHTML = renderEmptyPanel('暂无待办事项', '管理员概览加载失败，请稍后重试。', true);
+    document.getElementById("topCoursesRank").innerHTML = renderEmptyPanel('暂无课程排行', '管理员概览加载失败，请稍后重试。', true);
+    document.getElementById("activityPanel").innerHTML = renderEmptyPanel('暂无活动记录', '管理员概览加载失败，请稍后重试。', false);
+    document.getElementById("overviewExtra").innerHTML = '';
+    renderVisitChart([]);
+    renderRoleChart([]);
+    console.error(err);
+  });
+}
+
+function renderDashboard(data) {
+  document.getElementById("kpiGrid").innerHTML = [
+    card("总用户数", data.totalUsers, "fa-users", "var(--accent)"),
+    card("学生人数", data.totalStudents, "fa-user-graduate", "var(--accent-2)"),
+    card("教师人数", data.totalTeachers, "fa-chalkboard-user", "var(--accent-3)"),
+    card("课程数量", data.totalCourses, "fa-book-open", "var(--accent-4)"),
+    card("总选课人次", data.totalEnrollments, "fa-list-check", "#0ea5e9"),
+    card("今日活跃用户", data.todayActiveUsers, "fa-bolt", "#10b981"),
+    card("本周新增课程", data.weeklyNewCourses, "fa-layer-group", "#8b5cf6"),
+    card("本周新增用户", data.weeklyNewUsers, "fa-user-plus", "#f59e0b"),
+    card("待审核事项", data.pendingReviewCount, "fa-hourglass-half", "#ef4444")
+  ].join("");
+
+  document.getElementById("quickActionGrid").innerHTML = [
+    quickAction("查看课程", "fa-book", "switchTab('courses')"),
+    quickAction("查看日志", "fa-clock-rotate-left", "switchTab('logs')"),
+    quickAction("系统监控", "fa-heart-pulse", "switchTab('monitor')"),
+    quickAction("发布活动", "fa-bullhorn", "openActivityModal()"),
+    quickAction("导出用户", "fa-file-csv", "App.downloadFile('/admin/users/export','users.csv')")
+  ].join("");
+
+  document.getElementById("todoGrid").innerHTML = (data.todoItems || []).length
+    ? (data.todoItems || []).map(function(item) {
+        return '<div class="todo-item" onclick="switchTab(\'' + item.tab + '\')"><div><div class="fw-semibold">' + App.escapeHtml(formatTodoText(item)) + '</div><div class="small text-muted">点击前往处理页面</div></div><i class="fa-solid fa-chevron-right text-muted"></i></div>';
+      }).join("")
+    : renderEmptyPanel('暂无待办事项', '当前没有需要立刻处理的管理任务。', true);
+
+  document.getElementById("topCoursesRank").innerHTML = (data.topCourses || []).length
+    ? (data.topCourses || []).map(function(item, index) {
+        return '<div class="rank-item"><div><div class="fw-semibold">TOP ' + (index + 1) + ' · ' + App.escapeHtml(item.name || "未命名课程") + '</div><div class="small text-muted">教师：' + App.escapeHtml(item.teacher || "未分配教师") + '</div></div><span class="badge text-bg-primary">' + (item.value || 0) + ' 人</span></div>';
+      }).join("")
+    : renderEmptyPanel('暂无课程排行', '课程有选课记录后，会在这里显示热门课程。', true);
+
+  var overviewCards = [];
+  if ((data.pendingTeacherRequests || 0) > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">教师课程申请</div><div class="overview-stat">' + (data.pendingTeacherRequests || 0) + '</div></div>');
+  if ((data.pendingResourceUploads || 0) > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">用户上传资源</div><div class="overview-stat">' + (data.pendingResourceUploads || 0) + '</div></div>');
+  if ((data.pendingAppeals || 0) > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">用户申诉</div><div class="overview-stat">' + (data.pendingAppeals || 0) + '</div></div>');
+  if (data.storageWarningLow) overviewCards.push('<div class="monitor-mini-card alert"><div class="overview-label">存储状态</div><div class="overview-stat metric-value alert" style="font-size:18px">' + App.escapeHtml(formatStorageStatus(data)) + '</div></div>');
+  document.getElementById("overviewExtra").innerHTML = overviewCards.length
+    ? '<div class="section-card overview-summary-card"><div class="section-head"><h5 class="mb-0">待办内容拆分</h5><span class="metric-muted">聚焦当前需要处理的事项</span></div><div class="overview-summary-grid">' + overviewCards.join('') + '</div></div>'
+    : '';
+
+  renderVisitChart(data.recentVisits || []);
+  renderRoleChart((data.roleDistribution || []).filter(function(item) { return Number(item.value || 0) > 0; }));
+  renderActivities(data.activities || []);
+}
+
+function formatTodoText(item) {
+  var value = item && item.value;
+  if (!item || !item.key) return value || "";
+  if (item.key === "teachers") return (value || 0) + " 个教师课程申请待审核";
+  if (item.key === "appeals") return (value || 0) + " 条用户申诉待处理";
+  if (item.key === "storage") return "系统存储不足提醒：可用空间低于 " + (value == null ? 25 : value) + "%";
+  return value || "";
+}
+
+function formatStorageStatus(data) {
+  if (data && data.storageWarningLow) {
+    return "系统存储不足提醒：可用空间低于 " + (data.storageFreePercent == null ? 25 : data.storageFreePercent) + "%";
+  }
+  return "系统存储正常";
+}
+
+function card(label, value, icon, color) {
+  return '<div class="kpi-card"><div class="kpi-icon" style="background:' + color + '1a;color:' + color + '"><i class="fa-solid ' + icon + '"></i></div><div class="kpi-label">' + App.escapeHtml(label) + '</div><div class="kpi-value">' + (value == null ? 0 : value) + '</div></div>';
+}
+
+function quickAction(label, icon, handler) {
+  return '<button class="quick-action-btn" type="button" onclick="' + handler + '"><i class="fa-solid ' + icon + '"></i><span>' + App.escapeHtml(label) + '</span></button>';
+}
+
+function renderVisitChart(visits) {
+  var chartEl = document.getElementById("chartVisits");
+  if (!visits.length || !hasEcharts()) {
+    if (charts.visits && charts.visits.dispose) {
+      charts.visits.dispose();
+      charts.visits = null;
+    }
+    chartEl.innerHTML = renderEmptyPanel('暂无活跃数据', hasEcharts() ? '产生登录活跃记录后，这里会展示近 7 天活跃用户趋势。' : '图表资源加载失败，请稍后刷新重试。', false);
+    return;
+  }
+  chartEl.innerHTML = '';
+  charts.visits = charts.visits || echarts.init(chartEl);
+  charts.visits.setOption({
+    tooltip: { trigger: "axis" },
+    grid: { left: 40, right: 16, top: 20, bottom: 24 },
+    xAxis: { type: "category", data: visits.map(function(item) { return item.date; }) },
+    yAxis: { type: "value" },
+    series: [{ type: "line", smooth: true, areaStyle: {}, data: visits.map(function(item) { return item.value; }), itemStyle: { color: "#0f766e" }, lineStyle: { width: 3, color: "#0f766e" } }]
+  });
+  charts.visits.resize();
+}
+
+function renderRoleChart(items) {
+  var chartEl = document.getElementById("chartRoles");
+  var safeItems = (items || []).filter(function(item) { return Number(item.value || 0) > 0; });
+  if (!safeItems.length) {
+    if (charts.roles && charts.roles.dispose) {
+      charts.roles.dispose();
+      charts.roles = null;
+    }
+    chartEl.innerHTML = renderEmptyPanel('暂无角色数据', '创建用户后，这里会展示学生、教师和管理员的占比。', false);
+    return;
+  }
+  chartEl.innerHTML = '';
+  charts.roles = charts.roles || echarts.init(chartEl);
+  charts.roles.setOption({
+    tooltip: {
+      trigger: "item",
+      formatter: "{b}<br/>{c} 人 ({d}%)"
+    },
+    legend: {
+      bottom: 6,
+      left: "center",
+      itemWidth: 10,
+      itemHeight: 10
+    },
+    color: ["#3b82f6", "#10b981", "#f59e0b"],
+    series: [{
+      name: "用户角色",
+      type: "pie",
+      radius: ["40%", "62%"],
+      center: ["44%", "42%"],
+      avoidLabelOverlap: true,
+      itemStyle: {
+        borderColor: "#fff",
+        borderWidth: 4
+      },
+      labelLine: {
+        length: 12,
+        length2: 10
+      },
+      label: {
+        show: true,
+        formatter: "{b}\n{c} 人"
+      },
+      emphasis: {
+        label: {
+          show: true,
+          fontSize: 16,
+          fontWeight: 700
+        }
+      },
+      data: safeItems.map(function(item) {
+        return {
+          name: item.name || "未命名角色",
+          value: Number(item.value || 0)
+        };
+      })
+    }]
+  });
+  charts.roles.resize();
+}
+
+function renderUserPager(total, page) {
+  var pages = Math.max(1, Math.ceil(total / userPageSize));
+  var html = '<div class="d-flex justify-content-end align-items-center gap-2 mt-3"><span class="small text-muted">每页 ' + userPageSize + ' 行，第 ' + page + ' / ' + pages + ' 页</span>';
+  html += '<button class="btn btn-outline-secondary btn-sm" onclick="goUserPage(' + Math.max(1, page - 1) + ')" ' + (page <= 1 ? "disabled" : "") + '>上一页</button>';
+  for (var i = 1; i <= pages; i++) {
+    html += '<button class="btn ' + (i === page ? "btn-primary" : "btn-outline-secondary") + ' btn-sm" onclick="goUserPage(' + i + ')">' + i + '</button>';
+  }
+  html += '<button class="btn btn-outline-secondary btn-sm" onclick="goUserPage(' + Math.min(pages, page + 1) + ')" ' + (page >= pages ? "disabled" : "") + '>下一页</button></div>';
+  return html;
+}
+
+function renderActivities(list) {
+  document.getElementById('activityPanel').innerHTML = list && list.length
+    ? '<div class="d-flex flex-column gap-3">' + list.map(function(item) {
+        return '<div class="section-surface"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div class="flex-grow-1"><div class="fw-semibold">' + App.escapeHtml(item.title || '未命名活动') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(item.content || '暂无活动内容') + '</div><div class="small text-muted mt-2">发布时间：' + App.fmtTime(item.publishedAt) + ' · 受众：' + App.escapeHtml(renderActivityAudience(item.audience)) + ' · 版本：' + (item.publishVersion || 1) + '</div></div><div class="d-flex flex-column align-items-end gap-2"><span class="badge-soft ' + renderActivityStatusClass(item.status) + '">' + renderActivityStatus(item.status) + '</span><div class="d-flex gap-2 flex-wrap justify-content-end"><button class="btn btn-outline-primary btn-sm" onclick="editActivity(' + item.id + ')">编辑</button><button class="btn btn-outline-warning btn-sm" onclick="republishActivity(' + item.id + ')">重新发布</button><button class="btn btn-outline-danger btn-sm" onclick="deleteActivity(' + item.id + ')">删除</button></div></div></div></div>';
+      }).join('') + '</div>'
+    : renderEmptyPanel('暂无活动记录', '发布活动后，这里会显示可编辑、可删除、可重新发布的活动列表。', false);
+}
+
+function loadActivities() {
+  return api('/admin/activities').then(function(list) {
+    renderActivities(list || []);
+    return list || [];
+  }).catch(function(err) {
+    document.getElementById('activityPanel').innerHTML = renderEmptyPanel('暂无活动记录', err.message || '活动面板加载失败，请稍后重试。', false);
+    throw err;
+  });
+}
+
+function editActivity(id) {
+  return api('/admin/activities').then(function(list) {
+    var activity = (list || []).find(function(item) { return item.id === id; });
+    if (!activity) {
+      App.toast('活动不存在', 'warning');
+      return;
+    }
+    openActivityModal(activity);
+  });
+}
+
+function loadUsers() {
+  var kw = encodeURIComponent(userKeyword.value || "");
+  var role = encodeURIComponent(userRole.value || "");
+  return api("/admin/users/page?page=" + (userPage - 1) + "&size=" + userPageSize + "&keyword=" + kw + "&role=" + role).then(function(page) {
+    page = page || { content: [], totalElements: 0, totalPages: 1, number: 0 };
+    var total = page.totalElements == null ? (page.content || []).length : page.totalElements;
+    var pages = Math.max(1, page.totalPages || Math.ceil(total / userPageSize));
+    if (userPage > pages) {
+      userPage = pages;
+      return loadUsers();
+    }
+    document.getElementById("userBox").innerHTML = (page.content || []).length
+      ? '<div class="table-wrap"><table class="table table-hover align-middle"><thead><tr><th>ID</th><th>用户名</th><th>显示名称</th><th>邮箱</th><th>角色</th><th>状态</th><th>操作</th></tr></thead><tbody>' + (page.content || []).map(function(u) {
+          return '<tr><td>' + u.id + '</td><td>' + App.escapeHtml(u.username || "-") + '</td><td>' + App.escapeHtml(u.displayName || "未填写") + '</td><td>' + App.escapeHtml(u.email || "未填写邮箱") + '</td><td><span class="badge-soft ' + (u.role === "ADMIN" ? "bg-primary bg-opacity-10 text-primary" : u.role === "TEACHER" ? "bg-success bg-opacity-10 text-success" : "bg-info bg-opacity-10 text-info") + '">' + App.escapeHtml(u.role || "-") + '</span></td><td>' + (u.enabled ? '<span class="status-pill"><span class="color-dot bg-success"></span>启用</span>' : '<span class="status-pill" style="background:rgba(220,38,38,.12);color:#dc2626"><span class="color-dot bg-danger"></span>禁用</span>') + '</td><td class="d-flex gap-1 flex-wrap"><button class="btn btn-outline-secondary btn-sm" onclick="resetPassword(' + u.id + ')"><i class="fa-solid fa-key"></i></button><button class="btn btn-outline-primary btn-sm" onclick="toggleUser(' + u.id + ')"><i class="fa-solid fa-toggle-on"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteUser(' + u.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
+        }).join("") + '</tbody></table>' + renderUserPager(total, userPage) + '</div>'
+      : renderEmptyPanel('暂无用户数据', '当前筛选条件下没有匹配的用户记录。', false);
+  });
+}
+
+function goUserPage(page) {
+  userPage = page;
+  loadUsers();
+}
+
+function searchUsers() {
+  userPage = 1;
+  loadUsers();
+}
+
+function loadCourses() {
+  return api("/admin/course-options/teachers").then(function(options) {
+    teacherOptions = options || [];
+    var kw = encodeURIComponent(courseKeyword.value || "");
+    return api("/admin/courses/page?page=0&size=30&keyword=" + kw).then(function(page) {
+      currentCoursePage = (page && page.content) || [];
+      document.getElementById("courseBox").innerHTML = currentCoursePage.length
+        ? '<div class="table-wrap"><table class="table table-hover align-middle admin-course-table"><thead><tr><th><input type="checkbox" onchange="toggleAllCourses(this.checked)"></th><th>ID</th><th>课程</th><th>教师</th><th>时间</th><th>分类</th><th>容量</th><th>状态</th><th>操作</th></tr></thead><tbody>' + currentCoursePage.map(function(c) {
+            var teacherName = c.teacher ? (c.teacher.displayName || c.teacher.username || "-") : "-";
+            var visible = c.visible === false ? '<span class="badge text-bg-secondary">已下架</span>' : '<span class="badge text-bg-success">已上架</span>';
+            return '<tr><td><input type="checkbox" class="course-select" value="' + c.id + '"></td><td>' + c.id + '</td><td><div class="fw-semibold text-truncate">' + App.escapeHtml(c.name || "未命名课程") + '</div><div class="small text-muted text-truncate">' + App.escapeHtml(c.description || "暂无课程简介") + '</div></td><td class="text-truncate">' + App.escapeHtml(teacherName) + '</td><td class="text-truncate">' + App.escapeHtml(c.schedule || "时间待定") + '</td><td class="text-truncate">' + App.escapeHtml(c.category || "未分类") + '</td><td>' + (c.enrolledCount || 0) + '/' + (c.maxStudents || 0) + '</td><td>' + visible + '</td><td><div class="admin-course-actions"><button class="btn btn-outline-primary btn-sm" onclick="openCourseEdit(' + c.id + ')">编辑信息</button><button class="btn btn-outline-secondary btn-sm" onclick="openEnrollmentAdjust(' + c.id + ')">调整选课</button><button class="btn btn-outline-warning btn-sm" onclick="toggleCourseVisibility(' + c.id + ')">' + (c.visible === false ? '上架' : '下架') + '</button><button class="btn btn-outline-danger btn-sm" onclick="deleteCourse(' + c.id + ')">删除课程</button></div></td></tr>';
+          }).join("") + '</tbody></table></div>'
+        : renderEmptyPanel('暂无课程数据', '当前筛选条件下没有可管理的课程。', false);
+    });
+  });
+}
+
+function toggleAllCourses(checked) {
+  document.querySelectorAll(".course-select").forEach(function(el) { el.checked = checked; });
+}
+
+function selectedCourseIds() {
+  return Array.from(document.querySelectorAll(".course-select:checked")).map(function(el) { return Number(el.value); });
+}
+
+function openCourseEdit(id) {
+  if (!teacherOptions.length) {
+    return api("/admin/course-options/teachers").then(function(options) {
+      teacherOptions = options || [];
+      return openCourseEdit(id);
+    });
+  }
+  var course = currentCoursePage.find(function(item) { return item.id === id; });
+  if (!course) return;
+  editCourseId.value = course.id;
+  editCourseName.value = course.name || "";
+  editCourseSchedule.value = course.schedule || "";
+  editCourseMaxStudents.value = course.maxStudents || 0;
+  editCourseCredits.value = course.credits || 3;
+  editCourseCategory.value = course.category || "";
+  editCourseDescription.value = course.description || "";
+  editCourseTeacher.innerHTML = teacherOptions.map(function(t) {
+    var name = t.displayName || t.username || "-";
+    return '<option value="' + t.id + '" ' + (course.teacher && t.id === course.teacher.id ? 'selected' : '') + '>' + App.escapeHtml(name) + '</option>';
+  }).join("");
+  new bootstrap.Modal(document.getElementById("courseEditModal")).show();
+}
+
+function saveCourseEdit() {
+  return api("/admin/courses/" + editCourseId.value, "PUT", {
+    name: editCourseName.value.trim(),
+    teacherId: Number(editCourseTeacher.value),
+    schedule: editCourseSchedule.value.trim(),
+    maxStudents: Number(editCourseMaxStudents.value || 0),
+    description: editCourseDescription.value.trim(),
+    category: editCourseCategory.value.trim(),
+    credits: Number(editCourseCredits.value || 0)
+  }).then(function() {
+    bootstrap.Modal.getInstance(document.getElementById("courseEditModal")).hide();
+    loadCourses();
+    loadLogs();
+    loadDashboard();
+  });
+}
+
+function openEnrollmentAdjust(id) {
+  return api("/admin/courses/" + id + "/enrollments").then(function(data) {
+    enrollmentCourseId.value = id;
+    enrollmentMaxStudents.value = data.maxStudents || 0;
+    var selectedStudents = data.students || [];
+    var allStudents = data.allStudents || [];
+    enrollmentAddStudents.innerHTML = allStudents.filter(function(student) {
+      return !selectedStudents.some(function(selected) { return selected.id === student.id; });
+    }).map(function(student) {
+      return '<option value="' + student.id + '">' + App.escapeHtml((student.displayName || student.username || "-") + "（" + (student.username || "-") + "）") + '</option>';
+    }).join("");
+    if (!enrollmentAddStudents.innerHTML) {
+      enrollmentAddStudents.innerHTML = '<option disabled>暂无可添加学生</option>';
+    }
+    enrollmentRemoveStudents.innerHTML = selectedStudents.map(function(student) {
+      return '<option value="' + student.id + '">' + App.escapeHtml((student.displayName || student.username || "-") + "（" + (student.username || "-") + "）") + '</option>';
+    }).join("");
+    if (!enrollmentRemoveStudents.innerHTML) {
+      enrollmentRemoveStudents.innerHTML = '<option disabled>当前无人可移除</option>';
+    }
+    renderEnrollmentStudentTable(selectedStudents);
+    new bootstrap.Modal(document.getElementById("enrollmentModal")).show();
+  });
+}
+
+function renderEnrollmentStudentTable(students) {
+  document.getElementById("enrollmentStudentTable").innerHTML = students.length ? '<div class="table-wrap"><table class="table table-sm"><thead><tr><th>ID</th><th>姓名</th><th>用户名</th><th>邮箱</th><th>选课时间</th></tr></thead><tbody>' + students.map(function(student) {
+    return '<tr><td>' + student.id + '</td><td>' + App.escapeHtml(student.displayName || "-") + '</td><td>' + App.escapeHtml(student.username || "-") + '</td><td>' + App.escapeHtml(student.email || "-") + '</td><td>' + App.fmtTime(student.enrolledAt) + '</td></tr>';
+  }).join("") + '</tbody></table></div>' : '<div class="text-muted small">当前暂无已选学生</div>';
+}
+
+function pickSelectedValues(selectEl) {
+  return Array.from(selectEl.selectedOptions).map(function(option) { return Number(option.value); });
+}
+
+function saveEnrollmentAdjust() {
+  return api("/admin/courses/" + enrollmentCourseId.value + "/enrollments", "PUT", {
+    maxStudents: Number(enrollmentMaxStudents.value || 0),
+    addStudentIds: pickSelectedValues(enrollmentAddStudents),
+    removeStudentIds: pickSelectedValues(enrollmentRemoveStudents)
+  }).then(function() {
+    bootstrap.Modal.getInstance(document.getElementById("enrollmentModal")).hide();
+    loadCourses();
+    loadLogs();
+    loadDashboard();
+  });
+}
+
+function toggleCourseVisibility(id) {
+  return api("/admin/courses/" + id + "/visibility", "PUT").then(function() {
+    loadCourses();
+    loadLogs();
+    loadDashboard();
+  });
+}
+
+function deleteCourse(id) {
+  if (!confirm("确认删除该课程吗？删除后会同步清除关联选课数据。")) return Promise.resolve();
+  return api("/admin/courses/" + id, "DELETE").then(function() {
+    loadCourses();
+    loadLogs();
+    loadDashboard();
+  });
+}
+
+function batchHideCourses() {
+  var ids = selectedCourseIds();
+  if (!ids.length) return App.toast("请先勾选课程", "warning");
+  return api("/admin/courses/batch-hide", "PUT", { courseIds: ids }).then(function() {
+    loadCourses();
+    loadLogs();
+    loadDashboard();
+  });
+}
+
+function batchDeleteCourses() {
+  var ids = selectedCourseIds();
+  if (!ids.length) return App.toast("请先勾选课程", "warning");
+  if (!confirm("确认批量删除选中的课程吗？")) return Promise.resolve();
+  return api("/admin/courses/batch-delete", "DELETE", { courseIds: ids }).then(function() {
+    loadCourses();
+    loadLogs();
+    loadDashboard();
+  });
+}
+
+function loadLogs() {
+  return api("/admin/logs/page?page=0&size=20").then(function(page) {
+    page = page || { content: [] };
+    document.getElementById("logBox").innerHTML = (page.content || []).length
+      ? '<div class="table-wrap"><table class="table table-sm align-middle"><thead><tr><th>时间</th><th>用户</th><th>角色</th><th>动作</th><th>详情</th><th>IP</th></tr></thead><tbody>' + (page.content || []).map(function(l) {
+          return '<tr><td>' + App.fmtTime(l.timestamp) + '</td><td>' + App.escapeHtml(l.username || "-") + '</td><td>' + App.escapeHtml(l.role || "-") + '</td><td>' + App.escapeHtml(l.action || "-") + '</td><td>' + App.escapeHtml(l.details || "-") + '</td><td>' + App.escapeHtml(l.ipAddress || "-") + '</td></tr>';
+        }).join("") + '</tbody></table></div>'
+      : renderEmptyPanel('暂无审计日志', '当前没有可展示的审计记录。', false);
+  });
+}
+
+function formatMonitorMetricName(name, index) {
+  var labels = ["CPU使用率", "内存占用率", "磁盘使用率", "带宽占用率"];
+  return labels[index] || name || "-";
+}
+
+function formatDbMetricName(name, index) {
+  var labels = ["数据库连接数", "慢查询数量", "数据存储总大小(MB)"];
+  return labels[index] || name || "-";
+}
+
+function formatMonitorStatus(status) {
+  return status === "WARNING" ? "告警中" : "正常运行";
+}
+
+function formatDbStatus() {
+  return "已连接";
+}
+
+function formatAlertLevel(level) {
+  if (level === "CRITICAL") return "严重";
+  if (level === "WARNING") return "警告";
+  if (level === "INFO") return "提示";
+  return level === "严重" || level === "警告" || level === "提示" ? level : "警告";
+}
+
+function formatAlertTitle(title, index) {
+  var labels = ["CPU使用率持续偏高", "数据库连接数接近上限", "内存占用波动较大"];
+  return labels[index] || title || "系统告警";
+}
+
+function formatAlertStatus(status, index) {
+  var labels = ["已恢复", "跟进中", "已恢复"];
+  if (status === "OPEN") return "未处理";
+  if (status === "RECOVERED") return "已恢复";
+  if (status === "TRACKING") return "跟进中";
+  return labels[index] || status || "未处理";
+}
+
+function formatHealthSummary(report) {
+  var count = (report && report.abnormalItems || []).length;
+  return count ? "存在 " + count + " 项需关注异常" : "系统整体健康";
+}
+
+function formatHealthItem(item, index) {
+  var labels = ["CPU使用率超过安全阈值", "内存占用率超过安全阈值", "磁盘空间接近上限", "带宽占用异常波动", "数据库连接池建议扩容检查"];
+  return labels[index] || item || "系统状态正常";
+}
+
+function loadMonitor() {
+  return api("/admin/monitor").then(function(m) {
+    var resourceMetrics = m.resourceMetrics || [];
+    var dbMetrics = m.dbMetrics || [];
+    document.getElementById("monitorBox").innerHTML = (resourceMetrics.length || dbMetrics.length)
+      ? '<div class="monitor-metric-grid">' + resourceMetrics.map(function(metric, index) {
+          return '<div class="monitor-mini-card ' + (metric.alert ? 'alert' : '') + '"><div class="overview-label">' + App.escapeHtml(formatMonitorMetricName(metric.name, index)) + '</div><div class="overview-stat metric-value ' + (metric.alert ? 'alert' : '') + '">' + (metric.value == null ? 0 : metric.value) + '%</div><div class="small text-muted">安全阈值：' + (metric.threshold == null ? 0 : metric.threshold) + '%</div></div>';
+        }).join("") + '</div><div class="monitor-metric-grid mt-3">' + dbMetrics.map(function(metric, index) {
+          return '<div class="monitor-mini-card ' + (metric.alert ? 'alert' : '') + '"><div class="overview-label">' + App.escapeHtml(formatDbMetricName(metric.name, index)) + '</div><div class="overview-stat metric-value ' + (metric.alert ? 'alert' : '') + '">' + App.escapeHtml(metric.value == null ? 0 : metric.value) + '</div><div class="small text-muted">阈值：' + App.escapeHtml(metric.threshold == null ? 0 : metric.threshold) + '</div></div>';
+        }).join("") + '</div><div class="mt-3 small text-muted">系统状态：' + App.escapeHtml(formatMonitorStatus(m.status)) + '，运行时长：' + App.escapeHtml(m.uptime || "-") + '，数据库：' + App.escapeHtml(formatDbStatus()) + '</div>'
+      : renderEmptyPanel('暂无系统监控数据', '系统产生运行指标后，会在这里显示资源和数据库监控。', false);
+    renderResourceMonitorChart(m.resourceTrend || []);
+    renderServiceMonitorChart(m.serviceTrend || {});
+    renderErrorChart(m.errorStats || {});
+    renderAlertBox(m.alerts || []);
+    renderHealthReport(m.healthReport || {});
+  });
+}
+
+function renderResourceMonitorChart(items) {
+  var chartEl = document.getElementById("monitorResourceChart");
+  if (!items.length) {
+    chartEl.innerHTML = renderEmptyPanel('暂无资源趋势', '采集到资源波动后，这里会展示 CPU、内存、磁盘和带宽趋势。', false);
+    return;
+  }
+  chartEl.innerHTML = '';
+  charts.monitorResource = charts.monitorResource || echarts.init(chartEl);
+  charts.monitorResource.setOption({
+    tooltip: { trigger: "axis" },
+    legend: { data: items.map(function(item) { return item.name; }) },
+    xAxis: { type: "category", data: Array.from({ length: 12 }, function(_, i) { return i * 2 + "m"; }) },
+    yAxis: { type: "value", max: 100 },
+    series: items.map(function(item, index) {
+      var color = ["#0f766e", "#2563eb", "#d97706", "#7c3aed"][index % 4];
+      return { name: item.name, type: "line", smooth: true, data: item.values, lineStyle: { color: color, width: 3 }, itemStyle: { color: color }, markLine: { symbol: "none", data: [{ yAxis: 80, lineStyle: { color: "#ef4444", type: "dashed" } }] } };
+    })
+  });
+}
+
+function renderServiceMonitorChart(data) {
+  var chartEl = document.getElementById("monitorServiceChart");
+  if (!(data.labels || []).length) {
+    chartEl.innerHTML = renderEmptyPanel('暂无服务趋势', '有接口请求统计后，这里会展示成功率、响应时间和 QPS。', false);
+    return;
+  }
+  chartEl.innerHTML = '';
+  charts.monitorService = charts.monitorService || echarts.init(chartEl);
+  charts.monitorService.setOption({
+    tooltip: { trigger: "axis" },
+    legend: { data: ["请求成功率", "平均响应时间", "QPS"] },
+    xAxis: { type: "category", data: data.labels || [] },
+    yAxis: [{ type: "value", name: "%" }, { type: "value", name: "ms/QPS" }],
+    series: [
+      { name: "请求成功率", type: "line", smooth: true, data: data.successRate || [], yAxisIndex: 0 },
+      { name: "平均响应时间", type: "line", smooth: true, data: data.responseTime || [], yAxisIndex: 1 },
+      { name: "QPS", type: "bar", data: data.qps || [], yAxisIndex: 1, barMaxWidth: 18 }
+    ]
+  });
+}
+
+function renderErrorChart(data) {
+  var chartEl = document.getElementById("monitorErrorChart");
+  if (!(data.types || []).length) {
+    chartEl.innerHTML = renderEmptyPanel('暂无错误分布', '出现异常统计后，这里会展示错误类型分布。', false);
+    return;
+  }
+  chartEl.innerHTML = '';
+  charts.monitorError = charts.monitorError || echarts.init(chartEl);
+  charts.monitorError.setOption({
+    tooltip: { trigger: "item" },
+    series: [{ type: "pie", radius: ["40%", "68%"], data: ((data.types || []).map(function(item, index) {
+      var labels = ["参数校验", "权限异常", "数据库超时", "第三方依赖"];
+      return { name: labels[index] || item.name || "其他异常", value: item.value };
+    })) }]
+  });
+}
+
+function renderAlertBox(alerts) {
+  document.getElementById("alertBox").innerHTML = alerts.length
+    ? '<div class="table-wrap"><table class="table table-sm align-middle"><thead><tr><th>级别</th><th>告警内容</th><th>发生时间</th><th>处理状态</th></tr></thead><tbody>' + alerts.map(function(item, index) {
+        var level = formatAlertLevel(item.level);
+        var badge = level === "严重" ? "danger" : "warning";
+        return '<tr><td><span class="badge text-bg-' + badge + '">' + App.escapeHtml(level) + '</span></td><td>' + App.escapeHtml(formatAlertTitle(item.title, index)) + '</td><td>' + App.escapeHtml(item.time || "-") + '</td><td>' + App.escapeHtml(formatAlertStatus(item.status, index)) + '</td></tr>';
+      }).join("") + '</tbody></table></div>'
+    : renderEmptyPanel('暂无系统告警', '当前没有需要处理的系统告警。', true);
+}
+
+function renderHealthReport(report) {
+  document.getElementById("healthReportBox").innerHTML = report && ((report.abnormalItems || []).length || report.checkedAt)
+    ? '<div class="monitor-mini-card"><div class="fw-semibold mb-2">' + App.escapeHtml(formatHealthSummary(report)) + '</div><div class="small text-muted mb-3">检测时间：' + App.escapeHtml(report.checkedAt || "-") + '</div>' + ((report.abnormalItems || []).length ? '<ul class="mb-0">' + report.abnormalItems.map(function(item, index) { return '<li class="mb-1">' + App.escapeHtml(formatHealthItem(item, index)) + '</li>'; }).join("") + '</ul>' : '<div class="text-success">未发现异常项</div>') + '</div>'
+    : renderEmptyPanel('暂无健康报告', '执行健康检查后，这里会显示诊断结论。', true);
+}
+
+function runHealthCheck() {
+  return loadMonitor().then(function() { App.toast("系统健康检查已完成", "success"); });
+}
+
+function toggleUser(id) {
+  return api("/admin/users/" + id + "/toggle", "PUT").then(function() {
+    loadUsers();
+    loadDashboard();
+  });
+}
+
+function deleteUser(id) {
+  if (!confirm("确认删除此用户吗？")) return Promise.resolve();
+  return api("/admin/users/" + id, "DELETE").then(function() {
+    loadUsers();
+    loadDashboard();
+  });
+}
+
+function resetPassword(id) {
+  var pwd = prompt("请输入新密码");
+  if (!pwd) return Promise.resolve();
+  return api("/admin/users/" + id + "/password", "PUT", { password: pwd }).then(function() {
+    App.toast("密码已重置", "success");
+  });
+}
+
+(function initAdmin() {
+  loadDashboard();
+})();
+</script>
+</body>
+</html>

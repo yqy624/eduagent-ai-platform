@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     dashscope_api_key: Optional[str] = None
     dashscope_model: str = "qwen-max"
 
+    # Ollama（本地 LLM）
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
