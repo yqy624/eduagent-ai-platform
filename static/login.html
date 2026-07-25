@@ -256,7 +256,7 @@
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password, displayName: displayName || username, email: email || null, role: roleValue })
+          body: JSON.stringify({ username, password, display_name: displayName || username, email: email || null, role: roleValue })
         });
         const data = await res.json();
         if (data.code !== 200) throw new Error(data.message || "注册失败");
@@ -296,7 +296,7 @@
         const res = await fetch("/api/auth/forgot-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, role, email: email || null, newPassword: password })
+          body: JSON.stringify({ username, role, email: email || null, new_password: password })
         });
         const data = await res.json();
         if (data.code !== 200) throw new Error(data.message || "重置失败");

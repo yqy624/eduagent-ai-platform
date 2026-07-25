@@ -80,7 +80,8 @@ async def ensure_courses():
         course_ids = []
         for c in demo_courses:
             result = await db.execute(select(Course).where(Course.name == c["name"]))
-            if result.scalar_one_or_none() is None:
+            existing = result.scalar_one_or_none()
+            if existing is None:
                 course = Course(
                     name=c["name"], description=c["description"], schedule=c["schedule"],
                     credits=c["credits"], max_students=c["max_students"],
@@ -93,7 +94,6 @@ async def ensure_courses():
                 created += 1
                 print(f"  📚 创建课程: {c['name']}")
             else:
-                existing = result.scalar_one()
                 course_ids.append(existing.id)
 
         await db.commit()

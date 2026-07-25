@@ -16,14 +16,20 @@ import app.routers.admin as admin_router
 import app.routers.teacher as teacher_router
 import app.routers.student as student_router
 import app.routers.files as files_router
+import app.routers.notifications as notifications_router
 
 # AI 路由可选导入（依赖 langchain 等第三方包）
-try:
-    import app.routers.ai as ai_router
-    AI_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ AI 路由加载失败（可选）: {e}")
-    print("   AI 功能不可用，核心业务接口正常工作")
+if settings.ai_enabled:
+    try:
+        import app.routers.ai as ai_router
+        AI_AVAILABLE = True
+    except ImportError as e:
+        print(f"⚠️ AI 路由加载失败（可选）: {e}")
+        print("   AI 功能不可用，核心业务接口正常工作")
+        AI_AVAILABLE = False
+        ai_router = None
+else:
+    print("ℹ️ AI_ENABLED=false，已跳过 AI/Agent 路由加载")
     AI_AVAILABLE = False
     ai_router = None
 
@@ -65,6 +71,8 @@ app.include_router(admin_router.router)
 app.include_router(teacher_router.router)
 app.include_router(student_router.router)
 app.include_router(files_router.router)
+app.include_router(notifications_router.router)
+app.include_router(notifications_router.ws_router)
 if AI_AVAILABLE and ai_router:
     app.include_router(ai_router.router)
 

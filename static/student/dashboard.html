@@ -225,17 +225,7 @@ function switchTab(tab) {
 }
 
 async function api(url, method, body) {
-  if (method === undefined) method = "GET";
-  var res = await fetch("/api" + url, {
-    method: method,
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
-    body: body ? JSON.stringify(body) : null
-  });
-  var contentType = res.headers.get("content-type") || "";
-  var payload = contentType.indexOf("application/json") >= 0 ? await res.json() : await res.text();
-  if (!res.ok) throw new Error(parseApiErrorPayload(payload, "请求失败"));
-  if (!payload || payload.code !== 200) throw new Error(parseApiErrorPayload(payload, "请求失败"));
-  return payload.data;
+  return App.request(url, method, body);
 }
 
 async function openProfileModal() {
@@ -254,11 +244,11 @@ async function openProfileModal() {
 async function saveProfile() {
   try {
     var payload = {
-      displayName: profileDisplayName.value.trim(),
+      display_name: profileDisplayName.value.trim(),
       email: profileEmail.value.trim(),
-      newPassword: profilePassword.value.trim()
+      new_password: profilePassword.value.trim()
     };
-    if (!payload.newPassword) delete payload.newPassword;
+    if (!payload.new_password) delete payload.new_password;
     var profile = await api("/profile", "PUT", payload);
     var name = profile.displayName || profile.username || "学生";
     localStorage.setItem("displayName", name);
@@ -464,7 +454,9 @@ function previewStoredFile(path) {
 }
 
 function downloadStoredFile(path, name) {
-  return App.downloadFile('/files/download?path=' + encodeURIComponent(path), name || '附件');
+  var fileId = App.getStoredFileId(path);
+  if (!fileId) return Promise.reject(new Error('File identifier is invalid'));
+  return App.downloadFile('/files/' + encodeURIComponent(fileId) + '/download', name || '附件');
 }
 
 function openSubmissionDetail(id) {
@@ -509,13 +501,13 @@ async function submitAssignment() {
     var res = await fetch("/api/files/upload", { method: "POST", headers: { Authorization: "Bearer " + TOKEN }, body: fd });
     var data = await res.json();
     if (data.code !== 200) throw new Error(data.message || "上传失败");
-    filePath = data.data.path;
+    filePath = data.data.id;
     fileName = data.data.originalName;
   }
   await api("/student/assignments/" + id + "/submit", "POST", {
     content: submitContent.value.trim(),
-    filePath: filePath,
-    fileName: fileName
+    file_path: filePath,
+    file_name: fileName
   });
   bootstrap.Modal.getInstance(submitModal).hide();
   loadAssignments();

@@ -16,6 +16,7 @@ from app.schemas.assignment import (
     AssignmentCreate,
     AssignmentResponse,
     GradeRequest,
+    PeerReviewConfigUpdate,
     PeerReviewResponse,
     PeerReviewSubmit,
     SubmissionResponse,
@@ -278,6 +279,40 @@ class AssignmentService:
             "submittedCount": submitted_count,
             "pendingCount": total - submitted_count,
         }
+
+    async def update_peer_review(
+        self,
+        assignment_id: int,
+        req: PeerReviewConfigUpdate,
+        teacher: User,
+    ) -> Dict[str, Any]:
+        assignment = await self.get_by_id(assignment_id)
+        if assignment is None:
+            raise ValueError("作业不存在")
+
+        course_result = await self.db.execute(
+            select(Course).where(Course.id == assignment.course_id)
+        )
+        course = course_result.scalar_one_or_none()
+        if course is None:
+            raise ValueError("课程不存在")
+        if course.teacher_id != teacher.id and teacher.role != "ADMIN":
+            raise ValueError("无权配置此作业的互评")
+
+        def parse_datetime(value: Optional[str]) -> Optional[datetime]:
+            if not value:
+                return None
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+        assignment.peer_review_enabled = req.peer_review_enabled
+        assignment.peer_review_open_at = parse_datetime(req.peer_review_open_at)
+        assignment.peer_review_close_at = parse_datetime(req.peer_review_close_at)
+        assignment.peer_review_required_count = req.peer_review_required_count
+        assignment.peer_review_bonus_per_review = req.peer_review_bonus_per_review
+        assignment.peer_review_bonus_cap = req.peer_review_bonus_cap
+        assignment.peer_review_prompt = req.peer_review_prompt
+        await self.db.flush()
+        return await self.get_peer_review_overview(assignment_id)
 
     async def to_submission_response(
         self, submission: Submission

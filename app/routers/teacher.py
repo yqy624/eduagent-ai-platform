@@ -10,6 +10,7 @@ from app.schemas.assignment import (
     CourseCreate,
     CourseUpdate,
     GradeRequest,
+    PeerReviewConfigUpdate,
 )
 from app.schemas.common import ApiResponse
 from app.services.teacher_service import TeacherService
@@ -169,6 +170,40 @@ async def peer_review_overview(
     service = TeacherService(db)
     data = await service.get_peer_review_overview(assignment_id)
     return ApiResponse.ok(data=data)
+
+
+async def _update_peer_review(
+    assignment_id: int,
+    req: PeerReviewConfigUpdate,
+    user: User,
+    db: AsyncSession,
+):
+    service = TeacherService(db)
+    try:
+        data = await service.update_peer_review(assignment_id, req, user)
+        return ApiResponse.ok(data=data, message="互评配置已更新")
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
+
+
+@router.post("/assignments/{assignment_id}/peer-review")
+async def create_peer_review_config(
+    assignment_id: int,
+    req: PeerReviewConfigUpdate,
+    user: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _update_peer_review(assignment_id, req, user, db)
+
+
+@router.put("/assignments/{assignment_id}/peer-review")
+async def update_peer_review_config(
+    assignment_id: int,
+    req: PeerReviewConfigUpdate,
+    user: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _update_peer_review(assignment_id, req, user, db)
 
 
 @router.get("/comment-memories", include_in_schema=False)

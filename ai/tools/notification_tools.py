@@ -31,6 +31,22 @@ class NotificationTools:
         )
         self.db.add(notification)
         await self.db.flush()
+        from app.services.notification_hub import notification_hub
+        await notification_hub.publish(
+            recipient_username,
+            {
+                "type": "NOTIFICATION",
+                "id": notification.id,
+                "title": title,
+                "content": content,
+                "category": category,
+                "link": link,
+                "read": False,
+                "createdAt": notification.created_at.isoformat()
+                if notification.created_at
+                else None,
+            },
+        )
         return {
             "id": notification.id,
             "title": title,

@@ -275,19 +275,7 @@ function parseApiErrorPayload(payload, fallback) {
 }
 
 function api(path, method, body) {
-  if (method === undefined) method = "GET";
-  return fetch("/api" + path, {
-    method: method,
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
-    body: body ? JSON.stringify(body) : null
-  }).then(function(res) {
-    var contentType = res.headers.get("content-type") || "";
-    return (contentType.indexOf("application/json") >= 0 ? res.json() : res.text()).then(function(payload) {
-      if (!res.ok) throw new Error(parseApiErrorPayload(payload, "请求失败"));
-      if (!payload || payload.code !== 200) throw new Error(parseApiErrorPayload(payload, "请求失败"));
-      return payload.data;
-    });
-  });
+  return App.request(path, method, body);
 }
 
 function openProfileModal() {
@@ -302,11 +290,11 @@ function openProfileModal() {
 
 function saveProfile() {
   var payload = {
-    displayName: profileDisplayName.value.trim(),
+    display_name: profileDisplayName.value.trim(),
     email: profileEmail.value.trim(),
-    newPassword: profilePassword.value.trim()
+    new_password: profilePassword.value.trim()
   };
-  if (!payload.newPassword) delete payload.newPassword;
+  if (!payload.new_password) delete payload.new_password;
   return api("/profile", "PUT", payload).then(function(profile) {
     var name = profile.displayName || profile.username || "管理员";
     localStorage.setItem("displayName", name);
@@ -344,7 +332,7 @@ function openUserForm() {
 function createUser() {
   return api("/admin/users", "POST", {
     username: newUsername.value.trim(),
-    displayName: newDisplayName.value.trim(),
+    display_name: newDisplayName.value.trim(),
     email: newEmail.value.trim(),
     password: newPassword.value.trim(),
     role: newRole.value
@@ -714,9 +702,9 @@ function openCourseEdit(id) {
 function saveCourseEdit() {
   return api("/admin/courses/" + editCourseId.value, "PUT", {
     name: editCourseName.value.trim(),
-    teacherId: Number(editCourseTeacher.value),
+    teacher_id: Number(editCourseTeacher.value),
     schedule: editCourseSchedule.value.trim(),
-    maxStudents: Number(editCourseMaxStudents.value || 0),
+    max_students: Number(editCourseMaxStudents.value || 0),
     description: editCourseDescription.value.trim(),
     category: editCourseCategory.value.trim(),
     credits: Number(editCourseCredits.value || 0)
@@ -765,9 +753,9 @@ function pickSelectedValues(selectEl) {
 
 function saveEnrollmentAdjust() {
   return api("/admin/courses/" + enrollmentCourseId.value + "/enrollments", "PUT", {
-    maxStudents: Number(enrollmentMaxStudents.value || 0),
-    addStudentIds: pickSelectedValues(enrollmentAddStudents),
-    removeStudentIds: pickSelectedValues(enrollmentRemoveStudents)
+    max_students: Number(enrollmentMaxStudents.value || 0),
+    add_student_ids: pickSelectedValues(enrollmentAddStudents),
+    remove_student_ids: pickSelectedValues(enrollmentRemoveStudents)
   }).then(function() {
     bootstrap.Modal.getInstance(document.getElementById("enrollmentModal")).hide();
     loadCourses();

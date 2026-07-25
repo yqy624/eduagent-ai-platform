@@ -134,6 +134,33 @@ window.App = (function () {
     return Math.floor(diff / 86400) + " 天前";
   }
 
+  function parseApiErrorPayload(payload, fallback) {
+    if (!payload) return fallback;
+    if (typeof payload === "string") return payload;
+    return payload.message || payload.error || payload.detail || fallback;
+  }
+
+  async function request(path, method, body) {
+    if (method === undefined) method = "GET";
+    var res = await fetch("/api" + path, {
+      method: method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + (window.TOKEN || "")
+      },
+      body: body ? JSON.stringify(body) : null
+    });
+    var contentType = res.headers.get("content-type") || "";
+    var payload = contentType.indexOf("application/json") >= 0
+      ? await res.json()
+      : await res.text();
+    if (!res.ok) throw new Error(parseApiErrorPayload(payload, "请求失败"));
+    if (!payload || payload.code !== 200) {
+      throw new Error(parseApiErrorPayload(payload, "请求失败"));
+    }
+    return payload.data;
+  }
+
   async function initNotifications(token) {
     await loadNotifications();
     connectWebSocket(token);
@@ -141,7 +168,7 @@ window.App = (function () {
 
   async function loadNotifications() {
     try {
-      const data = await api("/notifications");
+      const data = await request("/notifications");
       if (data) {
         notifList = data;
         renderNotifications();
@@ -210,14 +237,14 @@ window.App = (function () {
   }
 
   async function readNotif(id) {
-    await api("/notifications/" + id + "/read", "PUT");
+    await request("/notifications/" + id + "/read", "PUT");
     var n = notifList.find(function(x) { return x.id === id; });
     if (n) n.read = true;
     renderNotifications();
   }
 
   async function markAllRead() {
-    await api("/notifications/read-all", "PUT");
+    await request("/notifications/read-all", "PUT");
     notifList.forEach(function(n) { n.read = true; });
     renderNotifications();
   }
@@ -230,13 +257,21 @@ window.App = (function () {
       var parts = raw.split('::');
       return {
         path: parts[0],
+        id: getStoredFileId(parts[0]),
         name: parts[1] || '附件'
       };
     }).filter(Boolean);
   }
 
-  async function previewFile(path) {
-    var res = await fetch('/api/files/preview?path=' + encodeURIComponent(path), { headers: { Authorization: 'Bearer ' + window.TOKEN } });
+  function getStoredFileId(value) {
+    var raw = String(value || '').split('::')[0].trim();
+    return /^\d+$/.test(raw) ? raw : null;
+  }
+
+  async function previewFile(fileRef) {
+    var fileId = getStoredFileId(fileRef);
+    if (!fileId) throw new Error('File identifier is invalid');
+    var res = await fetch('/api/files/' + encodeURIComponent(fileId) + '/preview', { headers: { Authorization: 'Bearer ' + window.TOKEN } });
     if (!res.ok) throw new Error('预览失败');
     var blob = await res.blob();
     var url = URL.createObjectURL(blob);
@@ -289,12 +324,14 @@ window.App = (function () {
     escapeHtml: escapeHtml,
     escapeAttr: escapeAttr,
     timeAgo: timeAgo,
+    request: request,
     initNotifications: initNotifications,
     toggleNotifPanel: toggleNotifPanel,
     hideNotifPanel: hideNotifPanel,
     readNotif: readNotif,
     markAllRead: markAllRead,
     parseStoredFiles: parseStoredFiles,
+    getStoredFileId: getStoredFileId,
     previewFile: previewFile,
     downloadFile: downloadFile,
     logout: logout,

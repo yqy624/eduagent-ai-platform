@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.models import (
     Assignment, Course, Enrollment, PeerReview, PublishedActivity, Submission, User,
 )
-from app.schemas.assignment import CourseCreate, CourseUpdate, GradeRequest
+from app.schemas.assignment import (
+    CourseCreate,
+    CourseUpdate,
+    GradeRequest,
+    PeerReviewConfigUpdate,
+)
 from app.services.assignment_service import AssignmentService
 from app.services.course_service import CourseService
 
@@ -131,6 +136,16 @@ class TeacherService:
 
     async def get_peer_review_overview(self, assignment_id: int) -> Dict:
         return await self.assignment_service.get_peer_review_overview(assignment_id)
+
+    async def update_peer_review(
+        self,
+        assignment_id: int,
+        req: PeerReviewConfigUpdate,
+        teacher: User,
+    ) -> Dict:
+        return await self.assignment_service.update_peer_review(
+            assignment_id, req, teacher
+        )
 
     async def _to_assignment_dict(self, assignment):
         return {

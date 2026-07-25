@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,14 +84,14 @@ async def preview_file(
     result = await db.execute(select(StoredFile).where(StoredFile.id == file_id))
     stored = result.scalar_one_or_none()
     if stored is None:
-        return ApiResponse.error(message="文件不存在", code=404)
+        raise HTTPException(status_code=404, detail="文件不存在")
 
     abs_path = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
         stored.storage_path.replace("\\", "/"),
     )
     if not os.path.exists(abs_path):
-        return ApiResponse.error(message="文件已被删除", code=404)
+        raise HTTPException(status_code=404, detail="文件已被删除")
 
     return FileResponse(
         path=abs_path,

@@ -17,6 +17,7 @@ venv/
 
 # 上传文件
 uploads/
+logs/
 *.db
 
 # OS

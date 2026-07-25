@@ -67,6 +67,16 @@ class AssignmentCreate(BaseModel):
     peer_review_prompt: Optional[str] = None
 
 
+class PeerReviewConfigUpdate(BaseModel):
+    peer_review_enabled: bool = False
+    peer_review_open_at: Optional[str] = None
+    peer_review_close_at: Optional[str] = None
+    peer_review_required_count: Optional[int] = Field(None, ge=1)
+    peer_review_bonus_per_review: Optional[float] = Field(None, ge=0)
+    peer_review_bonus_cap: Optional[float] = Field(None, ge=0)
+    peer_review_prompt: Optional[str] = None
+
+
 class AssignmentResponse(BaseModel):
     id: int
     title: str

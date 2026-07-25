@@ -160,6 +160,16 @@ edu-ai-platform/
 | `POST /api/student/assignments/{id}/submit` | STUDENT | 提交作业 |
 | `GET /api/student/grades` | STUDENT | 我的成绩 |
 
+### 阶段二接口契约
+
+- 所有 JSON 请求体使用后端 Schema 定义的 `snake_case` 字段，例如 `max_students`、`course_id`、`due_date`、`total_points`、`file_path` 和 `file_name`。
+- JSON 响应继续由 CamelCase 中间件转换为前端使用的 `camelCase` 字段。请求字段不会由中间件转换。
+- 文件上传：`POST /api/files/upload` 返回 `id`、`originalName`、`storagePath`、`size` 和 `contentType`。提交作业时将 `id` 作为 `file_path`，文件名作为 `file_name`；历史提交引用格式为 `id::fileName`。
+- 文件预览：`GET /api/files/{file_id}/preview`；文件下载：`GET /api/files/{file_id}/download`。文件不存在或磁盘文件缺失时返回 HTTP `404`。
+- 教师互评配置：`POST` 或 `PUT /api/teacher/assignments/{assignment_id}/peer-review`，请求字段包括 `peer_review_enabled`、`peer_review_open_at`、`peer_review_close_at`、`peer_review_required_count`、`peer_review_bonus_per_review`、`peer_review_bonus_cap` 和 `peer_review_prompt`。
+- 通知 REST：`GET /api/notifications`、`GET /api/notifications/unread-count`、`PUT /api/notifications/{notification_id}/read`、`PUT /api/notifications/read-all`。
+- 通知实时推送：连接 `ws(s)://<host>/ws/notifications?token=<JWT>`。连接成功返回 `CONNECTED`，新通知返回 `NOTIFICATION` 消息。
+
 ### AI 接口
 
 | 接口 | 角色 | 功能 |

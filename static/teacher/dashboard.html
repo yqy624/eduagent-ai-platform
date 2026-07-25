@@ -255,17 +255,7 @@ function switchTab(tab) {
 }
 
 async function api(url, method, body) {
-  if (method === undefined) method = "GET";
-  var res = await fetch("/api" + url, {
-    method: method,
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
-    body: body ? JSON.stringify(body) : null
-  });
-  var contentType = res.headers.get("content-type") || "";
-  var payload = contentType.indexOf("application/json") >= 0 ? await res.json() : await res.text();
-  if (!res.ok) throw new Error(parseApiErrorPayload(payload, "请求失败"));
-  if (!payload || payload.code !== 200) throw new Error(parseApiErrorPayload(payload, "请求失败"));
-  return payload.data;
+  return App.request(url, method, body);
 }
 
 async function openProfileModal() {
@@ -284,11 +274,11 @@ async function openProfileModal() {
 async function saveProfile() {
   try {
     var payload = {
-      displayName: profileDisplayName.value.trim(),
+      display_name: profileDisplayName.value.trim(),
       email: profileEmail.value.trim(),
-      newPassword: profilePassword.value.trim()
+      new_password: profilePassword.value.trim()
     };
-    if (!payload.newPassword) delete payload.newPassword;
+    if (!payload.new_password) delete payload.new_password;
     var profile = await api("/profile", "PUT", payload);
     var name = profile.displayName || profile.username || "教师";
     localStorage.setItem("displayName", name);
@@ -327,7 +317,9 @@ function previewStoredFile(path) {
 }
 
 function downloadStoredFile(path, name) {
-  return App.downloadFile('/files/download?path=' + encodeURIComponent(path), name || '附件');
+  var fileId = App.getStoredFileId(path);
+  if (!fileId) return Promise.reject(new Error('File identifier is invalid'));
+  return App.downloadFile('/files/' + encodeURIComponent(fileId) + '/download', name || '附件');
 }
 
 function renderActivityPager(total, page, action) {
@@ -441,7 +433,7 @@ async function saveCourse() {
     name: courseName.value.trim(),
     description: courseDesc.value.trim(),
     schedule: courseSchedule.value.trim(),
-    maxStudents: Number(courseMax.value || 50),
+    max_students: Number(courseMax.value || 50),
     credits: Number(courseCredits.value || 3)
   };
   if (courseId.value) {
@@ -509,9 +501,9 @@ async function publishAssignment() {
   await api("/teacher/assignments", "POST", {
     title: assignTitle.value.trim(),
     description: assignDesc.value.trim(),
-    dueDate: assignDue.value,
-    totalPoints: Number(assignPoints.value || 100),
-    course: { id: Number(assignCourse.value) }
+    due_date: assignDue.value,
+    total_points: Number(assignPoints.value || 100),
+    course_id: Number(assignCourse.value)
   });
   bootstrap.Modal.getInstance(assignModal).hide();
   loadAssignments();
@@ -557,13 +549,13 @@ async function openPeerConfig(assignmentId, title) {
 async function savePeerConfig() {
   var assignmentId = peerConfigAssignmentId.value;
   await api('/teacher/assignments/' + assignmentId + '/peer-review', 'POST', {
-    peerReviewEnabled: peerEnabled.checked,
-    peerReviewOpenAt: peerOpenAt.value || null,
-    peerReviewCloseAt: peerCloseAt.value || null,
-    peerReviewRequiredCount: Number(peerRequiredCount.value || 1),
-    peerReviewBonusPerReview: Number(peerBonusPerReview.value || 1),
-    peerReviewBonusCap: Number(peerBonusCap.value || 1),
-    peerReviewPrompt: peerPrompt.value.trim()
+    peer_review_enabled: peerEnabled.checked,
+    peer_review_open_at: peerOpenAt.value || null,
+    peer_review_close_at: peerCloseAt.value || null,
+    peer_review_required_count: Number(peerRequiredCount.value || 1),
+    peer_review_bonus_per_review: Number(peerBonusPerReview.value || 1),
+    peer_review_bonus_cap: Number(peerBonusCap.value || 1),
+    peer_review_prompt: peerPrompt.value.trim()
   });
   bootstrap.Modal.getInstance(peerConfigModal).hide();
   loadAssignments();
