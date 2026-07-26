@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Assignment, Course, User, Enrollment
 from app.schemas.assignment import CourseCreate, CourseUpdate, CourseResponse
+from app.services.notification_service import NotificationService
 
 
 class CourseService:
@@ -33,6 +34,14 @@ class CourseService:
         )
         self.db.add(course)
         await self.db.flush()
+        await NotificationService(self.db).create_for_roles(
+            ["STUDENT"],
+            "新课程已发布",
+            f"课程《{course.name}》已开放选课。",
+            category="COURSE",
+            type_="INFO",
+            link=f"/static/student/dashboard.html#course-{course.id}",
+        )
         return course
 
     async def update(
@@ -44,12 +53,22 @@ class CourseService:
         if course.teacher_id != teacher.id and teacher.role != "ADMIN":
             raise ValueError("无权修改此课程")
 
+        was_visible = bool(course.visible)
         update_data = req.model_dump(exclude_none=True)
         if "max_students" in update_data and update_data["max_students"] < course.enrolled_count:
             raise ValueError("课程容量不能小于当前选课人数")
         for key, value in update_data.items():
             setattr(course, key, value)
         await self.db.flush()
+        if not was_visible and course.visible:
+            await NotificationService(self.db).create_for_roles(
+                ["STUDENT"],
+                "课程重新上架",
+                f"课程《{course.name}》已重新开放。",
+                category="COURSE",
+                type_="INFO",
+                link=f"/static/student/dashboard.html#course-{course.id}",
+            )
         return course
 
     async def delete(self, course_id: int, teacher: User):

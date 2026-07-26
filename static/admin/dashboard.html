@@ -47,7 +47,7 @@
     <div class="nav-item active" data-tab="dashboard"><i class="fa-solid fa-chart-line"></i> 概览</div>
     <div class="nav-item" data-tab="users"><i class="fa-solid fa-users"></i> 用户管理</div>
     <div class="nav-item" data-tab="courses"><i class="fa-solid fa-book"></i> 课程管理</div>
-    <div class="nav-item" data-tab="logs"><i class="fa-solid fa-clock-rotate-left"></i> 审计日志</div>
+    <div class="nav-item" data-tab="activities"><i class="fa-solid fa-bullhorn"></i> 活动管理</div>
     <div class="nav-item" data-tab="monitor"><i class="fa-solid fa-heart-pulse"></i> 系统监控</div>
   </aside>
 
@@ -122,10 +122,10 @@
       </div>
     </section>
 
-    <section id="view-logs" class="view d-none">
+    <section id="view-activities" class="view d-none">
       <div class="section-card">
-        <div class="section-head"><h5 class="mb-0">审计日志</h5></div>
-        <div id="logBox"></div>
+        <div class="section-head"><h5 class="mb-0">活动管理</h5><button class="btn btn-primary btn-sm" onclick="openActivityModal()">发布活动</button></div>
+        <div id="activityManagePanel"></div>
       </div>
     </section>
 
@@ -135,7 +135,7 @@
         <div id="monitorBox"></div>
       </div>
       <div class="monitor-panel-grid">
-        <div class="section-card"><div class="section-head"><h5 class="mb-0">底层资源监控</h5></div><div id="monitorResourceChart" style="height:260px"></div></div>
+        <div class="section-card"><div class="section-head"><h5 class="mb-0">业务运行趋势</h5></div><div id="monitorResourceChart" style="height:260px"></div></div>
         <div class="section-card"><div class="section-head"><h5 class="mb-0">应用服务监控</h5></div><div id="monitorServiceChart" style="height:260px"></div></div>
         <div class="section-card"><div class="section-head"><h5 class="mb-0">错误类型分布</h5></div><div id="monitorErrorChart" style="height:260px"></div></div>
         <div class="monitor-stack">
@@ -276,6 +276,22 @@ function resizeVisibleCharts() {
     });
   });
 }
+function resetChart(key, el) {
+  if (charts[key] && charts[key].dispose) charts[key].dispose();
+  var instance = hasEcharts() ? echarts.getInstanceByDom(el) : null;
+  if (instance && instance.dispose) instance.dispose();
+  charts[key] = null;
+}
+function renderChartEmpty(key, el, title, description) {
+  resetChart(key, el);
+  el.innerHTML = renderEmptyPanel(title, description, false);
+}
+function createChart(key, el) {
+  resetChart(key, el);
+  el.innerHTML = "";
+  charts[key] = echarts.init(el);
+  return charts[key];
+}
 function parseApiErrorPayload(payload, fallback) {
   if (!payload) return fallback;
   if (typeof payload === "string") return payload;
@@ -317,7 +333,7 @@ function switchTab(tab) {
   tabs.forEach(function(x) { x.classList.toggle("active", x.dataset.tab === tab); });
   document.querySelectorAll(".view").forEach(function(v) { v.classList.add("d-none"); });
   document.getElementById("view-" + tab).classList.remove("d-none");
-  var title = { dashboard: "概览", users: "用户管理", courses: "课程管理", logs: "审计日志", monitor: "系统监控" }[tab] || "概览";
+  var title = { dashboard: "概览", users: "用户管理", courses: "课程管理", activities: "活动管理", monitor: "系统监控" }[tab] || "概览";
   document.getElementById("titleText").textContent = title;
   App.setBreadcrumb(["管理员工作台", title]);
   if (tab === "dashboard") {
@@ -326,7 +342,7 @@ function switchTab(tab) {
   }
   if (tab === "users") loadUsers();
   if (tab === "courses") loadCourses();
-  if (tab === "logs") loadLogs();
+  if (tab === "activities") loadActivityManagement();
   if (tab === "monitor") {
     loadMonitor();
     resizeVisibleCharts();
@@ -451,7 +467,7 @@ function renderDashboard(data) {
 
   document.getElementById("quickActionGrid").innerHTML = [
     quickAction("查看课程", "fa-book", "switchTab('courses')"),
-    quickAction("查看日志", "fa-clock-rotate-left", "switchTab('logs')"),
+    quickAction("活动管理", "fa-bullhorn", "switchTab('activities')"),
     quickAction("系统监控", "fa-heart-pulse", "switchTab('monitor')"),
     quickAction("发布活动", "fa-bullhorn", "openActivityModal()"),
     quickAction("导出用户", "fa-file-csv", "App.downloadFile('/admin/users/export','users.csv')")
@@ -601,8 +617,10 @@ function renderUserPager(total, page) {
   return html;
 }
 
-function renderActivities(list) {
-  document.getElementById('activityPanel').innerHTML = list && list.length
+function renderActivities(list, targetId) {
+  var panel = document.getElementById(targetId || 'activityPanel');
+  if (!panel) return;
+  panel.innerHTML = list && list.length
     ? '<div class="d-flex flex-column gap-3">' + list.map(function(item) {
         return '<div class="section-surface"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div class="flex-grow-1"><div class="fw-semibold">' + App.escapeHtml(item.title || '未命名活动') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(item.content || '暂无活动内容') + '</div><div class="small text-muted mt-2">发布时间：' + App.fmtTime(item.publishedAt) + ' · 受众：' + App.escapeHtml(renderActivityAudience(item.audience)) + ' · 版本：' + (item.publishVersion || 1) + '</div></div><div class="d-flex flex-column align-items-end gap-2"><span class="badge-soft ' + renderActivityStatusClass(item.status) + '">' + renderActivityStatus(item.status) + '</span><div class="d-flex gap-2 flex-wrap justify-content-end"><button class="btn btn-outline-primary btn-sm" onclick="editActivity(' + item.id + ')">编辑</button><button class="btn btn-outline-warning btn-sm" onclick="republishActivity(' + item.id + ')">重新发布</button><button class="btn btn-outline-danger btn-sm" onclick="deleteActivity(' + item.id + ')">删除</button></div></div></div></div>';
       }).join('') + '</div>'
@@ -612,11 +630,18 @@ function renderActivities(list) {
 function loadActivities() {
   return api('/admin/activities').then(function(list) {
     renderActivities(list || []);
+    renderActivities(list || [], 'activityManagePanel');
     return list || [];
   }).catch(function(err) {
     document.getElementById('activityPanel').innerHTML = renderEmptyPanel('暂无活动记录', err.message || '活动面板加载失败，请稍后重试。', false);
+    var managePanel = document.getElementById('activityManagePanel');
+    if (managePanel) managePanel.innerHTML = renderEmptyPanel('暂无活动记录', err.message || '活动管理加载失败，请稍后重试。', false);
     throw err;
   });
+}
+
+function loadActivityManagement() {
+  return loadActivities();
 }
 
 function editActivity(id) {
@@ -719,7 +744,6 @@ function saveCourseEdit() {
   }).then(function() {
     bootstrap.Modal.getInstance(document.getElementById("courseEditModal")).hide();
     loadCourses();
-    loadLogs();
     loadDashboard();
   });
 }
@@ -767,7 +791,6 @@ function saveEnrollmentAdjust() {
   }).then(function() {
     bootstrap.Modal.getInstance(document.getElementById("enrollmentModal")).hide();
     loadCourses();
-    loadLogs();
     loadDashboard();
   });
 }
@@ -775,7 +798,6 @@ function saveEnrollmentAdjust() {
 function toggleCourseVisibility(id) {
   return api("/admin/courses/" + id + "/visibility", "PUT").then(function() {
     loadCourses();
-    loadLogs();
     loadDashboard();
   });
 }
@@ -784,7 +806,6 @@ function deleteCourse(id) {
   if (!confirm("确认删除该课程吗？删除后会同步清除关联选课数据。")) return Promise.resolve();
   return api("/admin/courses/" + id, "DELETE").then(function() {
     loadCourses();
-    loadLogs();
     loadDashboard();
   });
 }
@@ -794,7 +815,6 @@ function batchHideCourses() {
   if (!ids.length) return App.toast("请先勾选课程", "warning");
   return api("/admin/courses/batch-hide", "PUT", { courseIds: ids }).then(function() {
     loadCourses();
-    loadLogs();
     loadDashboard();
   });
 }
@@ -805,34 +825,41 @@ function batchDeleteCourses() {
   if (!confirm("确认批量删除选中的课程吗？")) return Promise.resolve();
   return api("/admin/courses/batch-delete", "DELETE", { courseIds: ids }).then(function() {
     loadCourses();
-    loadLogs();
     loadDashboard();
   });
 }
 
-function loadLogs() {
-  return api("/admin/logs/page?page=0&size=20").then(function(page) {
-    page = page || { content: [] };
-    document.getElementById("logBox").innerHTML = (page.content || []).length
-      ? '<div class="table-wrap"><table class="table table-sm align-middle"><thead><tr><th>时间</th><th>用户</th><th>角色</th><th>动作</th><th>详情</th><th>IP</th></tr></thead><tbody>' + (page.content || []).map(function(l) {
-          return '<tr><td>' + App.fmtTime(l.timestamp) + '</td><td>' + App.escapeHtml(l.username || "-") + '</td><td>' + App.escapeHtml(l.role || "-") + '</td><td>' + App.escapeHtml(l.action || "-") + '</td><td>' + App.escapeHtml(l.details || "-") + '</td><td>' + App.escapeHtml(l.ipAddress || "-") + '</td></tr>';
-        }).join("") + '</tbody></table></div>'
-      : renderEmptyPanel('暂无审计日志', '当前没有可展示的审计记录。', false);
-  });
-}
-
 function formatMonitorMetricName(name, index) {
-  var labels = ["CPU使用率", "内存占用率", "磁盘使用率", "带宽占用率"];
-  return labels[index] || name || "-";
+  var labels = {
+    active_user_ratio: "近24小时活跃率",
+    pending_submission_ratio: "待批改提交占比",
+    storage_usage_ratio: "文件存储占用",
+    recent_upload_ratio: "近7天上传占比"
+  };
+  return labels[name] || name || "-";
 }
 
 function formatDbMetricName(name, index) {
-  var labels = ["数据库连接数", "慢查询数量", "数据存储总大小(MB)"];
-  return labels[index] || name || "-";
+  var labels = {
+    users: "用户总数",
+    audit_logs_24h: "24小时审计日志",
+    storage_mb: "文件存储(MB)"
+  };
+  return labels[name] || name || "-";
+}
+
+function formatMonitorTrendName(name) {
+  var labels = {
+    active_user_ratio: "活跃用户",
+    submission_activity: "作业提交",
+    upload_activity: "文件上传",
+    audit_activity: "审计事件"
+  };
+  return labels[name] || formatMonitorMetricName(name);
 }
 
 function formatMonitorStatus(status) {
-  return status === "WARNING" ? "告警中" : "正常运行";
+  return String(status || "").toUpperCase() === "WARNING" ? "告警中" : "正常运行";
 }
 
 function formatDbStatus() {
@@ -847,8 +874,13 @@ function formatAlertLevel(level) {
 }
 
 function formatAlertTitle(title, index) {
-  var labels = ["CPU使用率持续偏高", "数据库连接数接近上限", "内存占用波动较大"];
-  return labels[index] || title || "系统告警";
+  var labels = {
+    active_user_ratio: "近24小时活跃率超过阈值",
+    pending_submission_ratio: "待批改提交占比超过阈值",
+    storage_usage_ratio: "文件存储占用超过阈值",
+    recent_upload_ratio: "近7天上传占比超过阈值"
+  };
+  return labels[title] || title || "系统告警";
 }
 
 function formatAlertStatus(status, index) {
@@ -865,12 +897,17 @@ function formatHealthSummary(report) {
 }
 
 function formatHealthItem(item, index) {
-  var labels = ["CPU使用率超过安全阈值", "内存占用率超过安全阈值", "磁盘空间接近上限", "带宽占用异常波动", "数据库连接池建议扩容检查"];
-  return labels[index] || item || "系统状态正常";
+  var labels = {
+    active_user_ratio: "近24小时活跃率超过安全阈值",
+    pending_submission_ratio: "待批改提交占比超过安全阈值",
+    storage_usage_ratio: "文件存储占用超过安全阈值",
+    recent_upload_ratio: "近7天上传占比超过安全阈值"
+  };
+  return labels[item] || item || "系统状态正常";
 }
 
-function loadMonitor() {
-  return api("/admin/monitor").then(function(m) {
+function loadMonitor(healthCheck) {
+  return api("/admin/monitor" + (healthCheck ? "?healthCheck=true" : "")).then(function(m) {
     var resourceMetrics = m.resourceMetrics || [];
     var dbMetrics = m.dbMetrics || [];
     document.getElementById("monitorBox").innerHTML = (resourceMetrics.length || dbMetrics.length)
@@ -890,60 +927,61 @@ function loadMonitor() {
 
 function renderResourceMonitorChart(items) {
   var chartEl = document.getElementById("monitorResourceChart");
-  if (!items.length) {
-    chartEl.innerHTML = renderEmptyPanel('暂无资源趋势', '采集到资源波动后，这里会展示 CPU、内存、磁盘和带宽趋势。', false);
+  if (!items.length || !hasEcharts()) {
+    renderChartEmpty("monitorResource", chartEl, '暂无业务运行趋势', '产生登录、提交、上传或审计事件后，这里会展示业务运行变化。');
     return;
   }
-  chartEl.innerHTML = '';
-  charts.monitorResource = charts.monitorResource || echarts.init(chartEl);
+  var labels = (items[0] && items[0].labels) || Array.from({ length: 12 }, function(_, i) { return (i + 1) + ""; });
+  var legendLabels = items.map(function(item) { return formatMonitorTrendName(item.name); });
+  charts.monitorResource = createChart("monitorResource", chartEl);
   charts.monitorResource.setOption({
     tooltip: { trigger: "axis" },
-    legend: { data: items.map(function(item) { return item.name; }) },
-    xAxis: { type: "category", data: Array.from({ length: 12 }, function(_, i) { return i * 2 + "m"; }) },
+    legend: { data: legendLabels },
+    xAxis: { type: "category", data: labels },
     yAxis: { type: "value", max: 100 },
     series: items.map(function(item, index) {
       var color = ["#0f766e", "#2563eb", "#d97706", "#7c3aed"][index % 4];
-      return { name: item.name, type: "line", smooth: true, data: item.values, lineStyle: { color: color, width: 3 }, itemStyle: { color: color }, markLine: { symbol: "none", data: [{ yAxis: 80, lineStyle: { color: "#ef4444", type: "dashed" } }] } };
+      return { name: formatMonitorTrendName(item.name), type: "line", smooth: true, data: item.values || [], lineStyle: { color: color, width: 3 }, itemStyle: { color: color }, markLine: { symbol: "none", data: [{ yAxis: 80, lineStyle: { color: "#ef4444", type: "dashed" } }] } };
     })
   });
+  charts.monitorResource.resize();
 }
 
 function renderServiceMonitorChart(data) {
   var chartEl = document.getElementById("monitorServiceChart");
-  if (!(data.labels || []).length) {
-    chartEl.innerHTML = renderEmptyPanel('暂无服务趋势', '有接口请求统计后，这里会展示成功率、响应时间和 QPS。', false);
+  if (!(data.labels || []).length || !hasEcharts()) {
+    renderChartEmpty("monitorService", chartEl, '暂无服务趋势', '产生接口审计事件后，这里会展示成功率和事件量变化。');
     return;
   }
-  chartEl.innerHTML = '';
-  charts.monitorService = charts.monitorService || echarts.init(chartEl);
+  charts.monitorService = createChart("monitorService", chartEl);
   charts.monitorService.setOption({
     tooltip: { trigger: "axis" },
-    legend: { data: ["请求成功率", "平均响应时间", "QPS"] },
+    legend: { data: ["请求成功率", "负载指数", "接口事件数"] },
     xAxis: { type: "category", data: data.labels || [] },
-    yAxis: [{ type: "value", name: "%" }, { type: "value", name: "ms/QPS" }],
+    yAxis: [{ type: "value", name: "%" }, { type: "value", name: "次数/指数" }],
     series: [
       { name: "请求成功率", type: "line", smooth: true, data: data.successRate || [], yAxisIndex: 0 },
-      { name: "平均响应时间", type: "line", smooth: true, data: data.responseTime || [], yAxisIndex: 1 },
-      { name: "QPS", type: "bar", data: data.qps || [], yAxisIndex: 1, barMaxWidth: 18 }
+      { name: "负载指数", type: "line", smooth: true, data: data.responseTime || [], yAxisIndex: 1 },
+      { name: "接口事件数", type: "bar", data: data.qps || [], yAxisIndex: 1, barMaxWidth: 18 }
     ]
   });
+  charts.monitorService.resize();
 }
 
 function renderErrorChart(data) {
   var chartEl = document.getElementById("monitorErrorChart");
-  if (!(data.types || []).length) {
-    chartEl.innerHTML = renderEmptyPanel('暂无错误分布', '出现异常统计后，这里会展示错误类型分布。', false);
+  if (!(data.types || []).length || !hasEcharts()) {
+    renderChartEmpty("monitorError", chartEl, '暂无错误分布', '出现异常统计后，这里会展示错误类型分布。');
     return;
   }
-  chartEl.innerHTML = '';
-  charts.monitorError = charts.monitorError || echarts.init(chartEl);
+  charts.monitorError = createChart("monitorError", chartEl);
   charts.monitorError.setOption({
     tooltip: { trigger: "item" },
     series: [{ type: "pie", radius: ["40%", "68%"], data: ((data.types || []).map(function(item, index) {
-      var labels = ["参数校验", "权限异常", "数据库超时", "第三方依赖"];
-      return { name: labels[index] || item.name || "其他异常", value: item.value };
+      return { name: item.name || "其他异常", value: item.value };
     })) }]
   });
+  charts.monitorError.resize();
 }
 
 function renderAlertBox(alerts) {
@@ -951,7 +989,7 @@ function renderAlertBox(alerts) {
     ? '<div class="table-wrap"><table class="table table-sm align-middle"><thead><tr><th>级别</th><th>告警内容</th><th>发生时间</th><th>处理状态</th></tr></thead><tbody>' + alerts.map(function(item, index) {
         var level = formatAlertLevel(item.level);
         var badge = level === "严重" ? "danger" : "warning";
-        return '<tr><td><span class="badge text-bg-' + badge + '">' + App.escapeHtml(level) + '</span></td><td>' + App.escapeHtml(formatAlertTitle(item.title, index)) + '</td><td>' + App.escapeHtml(item.time || "-") + '</td><td>' + App.escapeHtml(formatAlertStatus(item.status, index)) + '</td></tr>';
+        return '<tr><td><span class="badge text-bg-' + badge + '">' + App.escapeHtml(level) + '</span></td><td>' + App.escapeHtml(formatAlertTitle(item.title || item.message, index)) + '</td><td>' + App.escapeHtml(item.time || "-") + '</td><td>' + App.escapeHtml(formatAlertStatus(item.status, index)) + '</td></tr>';
       }).join("") + '</tbody></table></div>'
     : renderEmptyPanel('暂无系统告警', '当前没有需要处理的系统告警。', true);
 }
@@ -963,7 +1001,7 @@ function renderHealthReport(report) {
 }
 
 function runHealthCheck() {
-  return loadMonitor().then(function() { App.toast("系统健康检查已完成", "success"); });
+  return loadMonitor(true).then(function() { App.toast("系统健康检查已完成", "success"); });
 }
 
 function toggleUser(id) {

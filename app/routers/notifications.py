@@ -2,7 +2,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -10,39 +10,63 @@ from app.middleware.auth import decode_access_token, get_current_user
 from app.models.models import Notification, User
 from app.schemas.common import ApiResponse
 from app.services.notification_hub import notification_hub
+from app.services.notification_service import NotificationService
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 ws_router = APIRouter(tags=["notifications"])
 
 
 def notification_payload(item: Notification) -> dict:
-    return {
-        "id": item.id,
-        "title": item.title,
-        "content": item.content,
-        "category": item.category,
-        "type": item.type,
-        "link": item.link,
-        "read": bool(item.is_read),
-        "created_at": item.created_at.isoformat() if item.created_at else None,
-    }
+    return NotificationService.to_payload(item)
 
 
 @router.get("")
 async def list_notifications(
     limit: int = Query(50, ge=1, le=100),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     unread_only: bool = Query(False),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    filters = [Notification.recipient == user.username]
+    if unread_only:
+        filters.append(Notification.is_read.is_(False))
+
+    if page is not None:
+        total = (
+            await db.execute(select(func.count(Notification.id)).where(*filters))
+        ).scalar() or 0
+        unread_total = (
+            await db.execute(
+                select(func.count(Notification.id)).where(
+                    Notification.recipient == user.username,
+                    Notification.is_read.is_(False),
+                )
+            )
+        ).scalar() or 0
+        result = await db.execute(
+            select(Notification)
+            .where(*filters)
+            .order_by(Notification.created_at.desc(), Notification.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        return ApiResponse.ok(data={
+            "content": [notification_payload(item) for item in result.scalars().all()],
+            "totalElements": total,
+            "number": page - 1,
+            "size": page_size,
+            "totalPages": (total + page_size - 1) // page_size,
+            "unreadCount": unread_total,
+        })
+
     query = (
         select(Notification)
-        .where(Notification.recipient == user.username)
+        .where(*filters)
         .order_by(Notification.created_at.desc(), Notification.id.desc())
         .limit(limit)
     )
-    if unread_only:
-        query = query.where(Notification.is_read.is_(False))
     result = await db.execute(query)
     return ApiResponse.ok(data=[notification_payload(item) for item in result.scalars().all()])
 
@@ -96,6 +120,26 @@ async def mark_all_read(
     )
     await db.flush()
     return ApiResponse.ok(message="通知已全部标记为已读")
+
+
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.recipient == user.username,
+        )
+    )
+    item = result.scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    await db.delete(item)
+    await db.flush()
+    return ApiResponse.ok(message="Notification deleted")
 
 
 @ws_router.websocket("/ws/notifications")

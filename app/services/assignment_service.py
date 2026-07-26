@@ -24,6 +24,7 @@ from app.schemas.assignment import (
     SubmissionResponse,
     AssignmentAnalysis,
 )
+from app.services.notification_service import NotificationService
 
 
 class AssignmentService:
@@ -117,6 +118,23 @@ class AssignmentService:
         await self.db.flush()
         if assignment.peer_review_enabled:
             await self._generate_peer_reviews(assignment)
+        await NotificationService(self.db).create_for_course_students(
+            assignment.course_id,
+            "新作业已发布",
+            f"《{course_obj.name}》发布了作业《{assignment.title}》。",
+            category="ASSIGNMENT",
+            type_="INFO",
+            link=f"/static/student/dashboard.html#assignment-{assignment.id}",
+        )
+        if assignment.peer_review_enabled:
+            await NotificationService(self.db).create_for_course_students(
+                assignment.course_id,
+                "互评任务已开启",
+                f"作业《{assignment.title}》已开启同伴互评。",
+                category="PEER_REVIEW",
+                type_="INFO",
+                link=f"/static/student/dashboard.html#peer-review-{assignment.id}",
+            )
         return assignment
 
     async def update(
@@ -338,6 +356,14 @@ class AssignmentService:
 
         # 更新选课表的 base_score
         await self._update_enrollment_score(submission.student_id, assignment.course_id)
+        await NotificationService(self.db).create_for_user_ids(
+            [submission.student_id],
+            "作业评分已完成",
+            f"《{course_obj.name}》的作业《{assignment.title}》已完成评分。",
+            category="GRADE",
+            type_="INFO",
+            link=f"/static/student/dashboard.html#grade-{submission.id}",
+        )
         return submission
 
     async def _update_enrollment_score(self, student_id: int, course_id: int):
@@ -489,6 +515,7 @@ class AssignmentService:
         if course.teacher_id != teacher.id and teacher.role != "ADMIN":
             raise ValueError("无权配置此作业的互评")
 
+        was_peer_review_enabled = bool(assignment.peer_review_enabled)
         assignment.peer_review_enabled = req.peer_review_enabled
         assignment.peer_review_open_at = self._parse_datetime(req.peer_review_open_at)
         assignment.peer_review_close_at = self._parse_datetime(req.peer_review_close_at)
@@ -505,6 +532,15 @@ class AssignmentService:
         await self.db.flush()
         if assignment.peer_review_enabled:
             await self._generate_peer_reviews(assignment)
+        if assignment.peer_review_enabled and not was_peer_review_enabled:
+            await NotificationService(self.db).create_for_course_students(
+                assignment.course_id,
+                "互评任务已开启",
+                f"作业《{assignment.title}》已开启同伴互评。",
+                category="PEER_REVIEW",
+                type_="INFO",
+                link=f"/static/student/dashboard.html#peer-review-{assignment.id}",
+            )
         return await self.get_peer_review_overview(assignment_id)
 
     async def _generate_peer_reviews(self, assignment: Assignment):
