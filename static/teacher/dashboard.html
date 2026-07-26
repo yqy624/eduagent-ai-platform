@@ -18,8 +18,18 @@
     .global-overview-progress span{display:block;height:100%;border-radius:999px;background:var(--accent)}
     .global-next-action{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-card)}
     .ai-workspace-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.75fr);gap:14px}
-    .ai-trace-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto}
-    .ai-trace-item{border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--bg-soft)}
+    .ai-mode-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .ai-mode-button{border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-main);padding:7px 12px;font-size:13px}
+    .ai-mode-button.active{border-color:var(--accent);background:var(--accent);color:#fff}
+    .ai-chat-history{display:flex;flex-direction:column;gap:12px;max-height:520px;overflow:auto;padding:4px}
+    .ai-chat-message{display:flex;flex-direction:column;gap:4px;max-width:92%}
+    .ai-chat-message.user{align-self:flex-end;align-items:flex-end}
+    .ai-chat-message.assistant{align-self:flex-start;align-items:flex-start}
+    .ai-chat-bubble{border:1px solid var(--border);border-radius:12px;padding:10px 12px;white-space:pre-wrap;line-height:1.55}
+    .ai-chat-message.user .ai-chat-bubble{background:var(--accent);border-color:var(--accent);color:#fff}
+    .ai-chat-message.assistant .ai-chat-bubble{background:var(--bg-soft)}
+    .ai-chat-meta{font-size:11px;color:var(--text-muted)}
+    .ai-chat-citations{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px}
     @media (max-width: 992px){.ai-workspace-grid{grid-template-columns:1fr}}
     @media (max-width: 576px){.global-overview-grid{grid-template-columns:1fr}.global-next-action{align-items:flex-start;flex-direction:column}}
   </style>
@@ -250,7 +260,56 @@ var teacherActivityPage = 1;
 var teacherActivityPageSize = 3;
 var quickCommentCategory = 'all';
 var analysisChartIds = [];
-var teacherLastAiRunId = null;
+var teacherAiMode = localStorage.getItem("teacherAiMode") || "course_material";
+var teacherAiMessages = readTeacherAiMessages();
+var teacherAiModeLabels = {
+  course_material: "课程资料",
+  assignment_submission: "作业提交",
+  teaching_advice: "教学建议",
+  other: "其他问题"
+};
+function readTeacherAiMessages() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("teacherAiMessages") || "[]");
+    return Array.isArray(saved) ? saved.slice(-30) : [];
+  } catch (err) {
+    return [];
+  }
+}
+function saveTeacherAiMessages() {
+  localStorage.setItem("teacherAiMessages", JSON.stringify(teacherAiMessages.slice(-30)));
+}
+function setTeacherAiMode(mode) {
+  teacherAiMode = teacherAiModeLabels[mode] ? mode : "other";
+  localStorage.setItem("teacherAiMode", teacherAiMode);
+  document.querySelectorAll("#teacherAiModes .ai-mode-button").forEach(function(button) {
+    button.classList.toggle("active", button.dataset.mode === teacherAiMode);
+  });
+}
+function renderTeacherAiCitations(citations) {
+  if (!citations || !citations.length) return "";
+  return '<div class="ai-chat-citations"><div class="fw-semibold mb-1">课程资料引用</div>' +
+    citations.map(function(c) {
+      return '<div>' + App.escapeHtml(c.source || "课程资料") + ' · chunk ' +
+        (c.chunkIndex != null ? c.chunkIndex : c.chunk_index || 0) + ' · 相似度 ' +
+        Number(c.similarity || c.score || 0).toFixed(2) + '</div>';
+    }).join("") + '</div>';
+}
+function renderTeacherAiChat() {
+  var history = document.getElementById("teacherAiChatHistory");
+  if (!history) return;
+  if (!teacherAiMessages.length) {
+    history.innerHTML = '<div class="text-muted small">选择问题分类后开始对话。助手会结合课程资料和教学数据持续理解当前上下文。</div>';
+    return;
+  }
+  history.innerHTML = teacherAiMessages.map(function(item) {
+    var roleLabel = item.role === "user" ? "我" : "助手";
+    return '<div class="ai-chat-message ' + (item.role === "user" ? "user" : "assistant") + '">' +
+      '<div class="ai-chat-meta">' + roleLabel + (item.mode ? ' · ' + App.escapeHtml(teacherAiModeLabels[item.mode] || item.mode) : '') + '</div>' +
+      '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderTeacherAiCitations(item.citations) + '</div></div>';
+  }).join("");
+  history.scrollTop = history.scrollHeight;
+}
 function hasEcharts() {
   return typeof window.echarts !== "undefined";
 }
@@ -844,32 +903,33 @@ async function loadAnalysis() {
 
 async function loadTeacherAiAgent() {
   var box = document.getElementById("teacherAiBox");
-  box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">知识库索引、课程问答、运行轨迹</span></div><div class="text-muted small">加载中...</div>';
+  box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">知识库索引、教学数据与校园问答</span></div><div class="text-muted small">加载中...</div>';
   try {
     var courses = await api("/teacher/courses");
-    if (!courses.length) {
-      box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5></div>' + renderEmptyPanel('暂无课程', '创建课程后可以索引课程资料并测试问答。', false);
-      return;
-    }
-    var options = courses.map(function(c) {
+    var options = courses.length ? courses.map(function(c) {
       return '<option value="' + c.id + '">' + App.escapeHtml(c.name || '未命名课程') + '</option>';
-    }).join('');
+    }).join('') : '<option value="">暂无课程</option>';
     box.innerHTML =
-      '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">知识库索引、课程问答、运行轨迹</span></div>' +
+      '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">连续对话与个性化教学助手</span></div>' +
       '<div class="ai-workspace-grid">' +
         '<div class="section-surface">' +
-          '<label class="form-label" for="teacherAiCourse">课程</label><select id="teacherAiCourse" class="form-select mb-3">' + options + '</select>' +
-          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="indexTeacherCourseDocs()"><i class="fa-solid fa-database me-1"></i>索引课程资料</button><button class="btn btn-outline-secondary btn-sm" onclick="loadTeacherRunTrace()"><i class="fa-solid fa-list-check me-1"></i>查看轨迹</button></div>' +
-          '<label class="form-label" for="teacherAiQuestion">问答测试</label><textarea id="teacherAiQuestion" class="form-control mb-2" rows="4" placeholder="输入一个课程资料相关问题"></textarea>' +
-          '<button class="btn btn-outline-primary btn-sm mb-3" onclick="askTeacherCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>提问</button>' +
-          '<div id="teacherAiResult" class="small text-muted">索引后可验证课程资料问答是否能给出引用。</div>' +
+          '<label class="form-label" for="teacherAiCourse">课程</label><select id="teacherAiCourse" class="form-select mb-3" ' + (!courses.length ? 'disabled' : '') + '>' + options + '</select>' +
+          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="indexTeacherCourseDocs()"><i class="fa-solid fa-database me-1"></i>索引课程资料</button></div>' +
+          '<div id="teacherAiModes" class="ai-mode-tabs" role="tablist">' +
+            Object.keys(teacherAiModeLabels).map(function(mode) {
+              return '<button type="button" class="ai-mode-button ' + (mode === teacherAiMode ? 'active' : '') + '" data-mode="' + mode + '" onclick="setTeacherAiMode(\'' + mode + '\')">' + teacherAiModeLabels[mode] + '</button>';
+            }).join("") +
+          '</div>' +
+          '<label class="form-label" for="teacherAiQuestion">对话内容</label><textarea id="teacherAiQuestion" class="form-control mb-2" rows="3" placeholder="先选择问题分类，再输入你的问题"></textarea>' +
+          '<button class="btn btn-outline-primary btn-sm mb-3" onclick="askTeacherCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>发送</button>' +
+          '<div id="teacherAiChatHistory" class="ai-chat-history"></div>' +
         '</div>' +
         '<div class="section-surface">' +
-          '<div class="d-flex justify-content-between align-items-center mb-2"><div class="fw-semibold">运行轨迹</div><input id="teacherRunIdInput" class="form-control form-control-sm" style="max-width:130px" placeholder="run id"></div>' +
-          '<div class="d-flex gap-2 mb-2"><button class="btn btn-outline-secondary btn-sm" onclick="loadTeacherRunTrace()"><i class="fa-solid fa-rotate"></i></button></div>' +
-          '<div id="teacherRunTrace" class="ai-trace-list text-muted small">暂无运行记录</div>' +
+          '<div class="fw-semibold mb-2">当前对话</div>' +
+          '<div class="small text-muted">分类会直接决定助手使用的回答范围；历史对话会用于理解课程教学目标和你的工作偏好。</div>' +
         '</div>' +
       '</div>';
+    renderTeacherAiChat();
   } catch (err) {
     box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false);
   }
@@ -877,55 +937,50 @@ async function loadTeacherAiAgent() {
 
 async function indexTeacherCourseDocs() {
   var courseId = document.getElementById("teacherAiCourse").value;
-  var resultBox = document.getElementById("teacherAiResult");
-  resultBox.innerHTML = '<span class="text-muted">正在索引课程资料...</span>';
+  if (!courseId) {
+    App.showToast('请先选择课程', 'warning');
+    return;
+  }
+  var resultBox = document.getElementById("teacherAiChatHistory");
+  if (!resultBox) return;
+  resultBox.innerHTML = '<div class="text-muted small">正在索引课程资料...</div>';
   try {
     var data = await api('/ai/courses/' + courseId + '/documents/index', 'POST', {});
-    resultBox.innerHTML = '<div class="fw-semibold mb-2">索引完成</div><div>文件 ' + (data.fileCount || data.file_count || 0) + ' 个，作业 ' + (data.assignmentCount || data.assignment_count || 0) + ' 个，切片 ' + (data.chunkCount || data.chunk_count || 0) + ' 个。</div>' +
-      ((data.indexedFiles || data.indexed_files || []).map(function(item) {
-        return '<div class="small border-top py-2">' + App.escapeHtml(item.name || '文件') + ' · ' + App.escapeHtml(item.status || '-') + ' · chunks ' + (item.chunkCount || item.chunk_count || 0) + (item.vectorError || item.vector_error ? '<div class="text-muted">向量索引降级：' + App.escapeHtml(item.vectorError || item.vector_error) + '</div>' : '') + '</div>';
-      }).join(''));
+    var indexedFiles = data.indexedFiles || data.indexed_files || [];
+    var summary = '课程资料索引完成：文件 ' + (data.fileCount || data.file_count || 0) + ' 个，作业 ' +
+      (data.assignmentCount || data.assignment_count || 0) + ' 个，切片 ' + (data.chunkCount || data.chunk_count || 0) + ' 个。';
+    if (indexedFiles.length) {
+      summary += '\n' + indexedFiles.map(function(item) {
+        return (item.name || '文件') + '：' + (item.status || '-') + '，chunks ' + (item.chunkCount || item.chunk_count || 0);
+      }).join('\n');
+    }
+    teacherAiMessages.push({ role: "assistant", text: summary, mode: "course_material" });
+    saveTeacherAiMessages();
+    renderTeacherAiChat();
   } catch (err) {
     resultBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '索引失败') + '</span>';
   }
 }
 
 async function askTeacherCourseQa() {
-  var courseId = document.getElementById("teacherAiCourse").value;
+  var courseEl = document.getElementById("teacherAiCourse");
+  var courseId = courseEl && courseEl.value ? Number(courseEl.value) : null;
   var question = document.getElementById("teacherAiQuestion").value.trim();
   if (!question) {
     App.showToast('请先输入问题', 'warning');
     return;
   }
-  var resultBox = document.getElementById("teacherAiResult");
-  resultBox.innerHTML = '<span class="text-muted">正在检索课程资料...</span>';
+  var resultBox = document.getElementById("teacherAiChatHistory");
+  resultBox.innerHTML = '<div class="text-muted small">正在回复...</div>';
   try {
-    var data = await api('/ai/courses/' + courseId + '/qa', 'POST', { question: question });
-    teacherLastAiRunId = data.runId || data.run_id || null;
-    if (teacherLastAiRunId && document.getElementById("teacherRunIdInput")) teacherRunIdInput.value = teacherLastAiRunId;
-    var citations = data.citations || [];
-    resultBox.innerHTML =
-      '<div class="fw-semibold mb-2">回答</div><div style="white-space:pre-wrap">' + App.escapeHtml(data.answer || '') + '</div>' +
-      (citations.length ? '<div class="fw-semibold mt-3 mb-1">引用</div>' + citations.map(function(c) {
-        return '<div class="small border-top py-2">' + App.escapeHtml(c.source || '课程资料') + ' · chunk ' + (c.chunkIndex != null ? c.chunkIndex : c.chunk_index || 0) + ' · 相似度 ' + Number(c.similarity || c.score || 0).toFixed(2) + '</div>';
-      }).join('') : '');
-    loadTeacherRunTrace();
+    var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: teacherAiMode });
+    teacherAiMessages.push({ role: "user", text: question, mode: teacherAiMode });
+    teacherAiMessages.push({ role: "assistant", text: data.answer || "", mode: teacherAiMode, citations: data.citations || [] });
+    saveTeacherAiMessages();
+    document.getElementById("teacherAiQuestion").value = "";
+    renderTeacherAiChat();
   } catch (err) {
     resultBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '问答失败') + '</span>';
-  }
-}
-
-async function loadTeacherRunTrace() {
-  var traceBox = document.getElementById("teacherRunTrace");
-  if (!traceBox) return;
-  var input = document.getElementById("teacherRunIdInput");
-  var runId = input && input.value ? input.value.trim() : teacherLastAiRunId;
-  if (!runId) return;
-  try {
-    var calls = await api('/ai/runs/' + runId + '/tool-calls');
-    traceBox.innerHTML = calls.length ? calls.map(renderAiTraceItem).join('') : '<div class="text-muted small">暂无工具调用</div>';
-  } catch (err) {
-    traceBox.innerHTML = '<div class="text-danger small">' + App.escapeHtml(err.message || '轨迹加载失败') + '</div>';
   }
 }
 
@@ -936,7 +991,6 @@ async function requestAiGradeSuggestion() {
   try {
     var data = await api('/ai/teacher/submissions/' + id + '/grade-suggestion', 'POST', {});
     gradeAiSuggestionId.value = data.id || '';
-    teacherLastAiRunId = data.runId || data.run_id || null;
     gradeScore.value = data.suggestedScore != null ? data.suggestedScore : (data.suggested_score || '');
     gradeComment.value = data.comment || '';
     aiGradeSuggestionBox.innerHTML = renderGradeSuggestion(data);
@@ -953,8 +1007,7 @@ function renderGradeSuggestion(data) {
     '<div class="mt-1" style="white-space:pre-wrap">' + App.escapeHtml(data.comment || '') + '</div>' +
     (strengths.length ? '<div class="mt-2 text-success">优点：' + strengths.map(App.escapeHtml).join('；') + '</div>' : '') +
     (weaknesses.length ? '<div class="mt-1 text-warning">改进：' + weaknesses.map(App.escapeHtml).join('；') + '</div>' : '') +
-    (risks.length ? '<div class="mt-1 text-danger">风险：' + risks.map(App.escapeHtml).join('；') + '</div>' : '') +
-    (teacherLastAiRunId ? '<div class="mt-2 small text-muted">run_id: ' + teacherLastAiRunId + '</div>' : '');
+    (risks.length ? '<div class="mt-1 text-danger">风险：' + risks.map(App.escapeHtml).join('；') + '</div>' : '');
 }
 
 async function approveAiGradeSuggestion() {
@@ -996,18 +1049,12 @@ async function regenerateAiGradeSuggestion() {
   try {
     var data = await api('/ai/feedback/' + suggestionId + '/regenerate', 'POST', {});
     gradeAiSuggestionId.value = data.id || '';
-    teacherLastAiRunId = data.runId || data.run_id || null;
     gradeScore.value = data.suggestedScore != null ? data.suggestedScore : (data.suggested_score || '');
     gradeComment.value = data.comment || '';
     aiGradeSuggestionBox.innerHTML = renderGradeSuggestion(data);
   } catch (err) {
     aiGradeSuggestionBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '重新生成失败') + '</span>';
   }
-}
-
-function renderAiTraceItem(call) {
-  return '<div class="ai-trace-item"><div class="fw-semibold">' + App.escapeHtml(call.toolName || call.tool_name || 'tool') + '</div>' +
-    '<div class="small text-muted">' + (call.latencyMs || call.latency_ms || 0) + ' ms' + (call.error ? ' · ' + App.escapeHtml(call.error) : '') + '</div></div>';
 }
 
 loadDashboard();

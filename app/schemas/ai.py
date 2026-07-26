@@ -28,6 +28,26 @@ class QAResponse(BaseModel):
     run_id: Optional[int] = None
 
 
+class AgentChatRequest(BaseModel):
+    """Agent 对话请求"""
+    question: str = Field(..., min_length=1, max_length=2000)
+    course_id: Optional[int] = None
+    mode: str = Field(
+        default="other",
+        pattern="^(course_material|assignment_submission|teaching_advice|other)$",
+    )
+
+
+class AgentChatResponse(BaseModel):
+    """Agent 对话响应"""
+    answer: str
+    mode: str
+    citations: List[Citation] = []
+    confidence: float = 0.0
+    run_id: Optional[int] = None
+    memory_count: int = 0
+
+
 class DiagnosisResponse(BaseModel):
     """学情诊断结果"""
     student_id: int
