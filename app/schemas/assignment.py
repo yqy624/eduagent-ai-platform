@@ -119,6 +119,7 @@ class SubmissionResponse(BaseModel):
 
 class SubmissionSubmit(BaseModel):
     content: Optional[str] = None
+    file_id: Optional[int] = None
     file_path: Optional[str] = None
     file_name: Optional[str] = None
 

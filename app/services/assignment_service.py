@@ -9,6 +9,7 @@ from app.models.models import (
     Course,
     Enrollment,
     PeerReview,
+    StoredFile,
     Submission,
     User,
 )
@@ -183,6 +184,53 @@ class AssignmentService:
         )
         return list(result.scalars().all())
 
+    async def _get_submission_file(
+        self,
+        file_ref: Optional[str],
+        assignment: Assignment,
+        student: User,
+        existing_submission: Optional[Submission],
+    ) -> Optional[StoredFile]:
+        if not file_ref:
+            return None
+        raw_file_id = str(file_ref).split("::", 1)[0].strip()
+        if not raw_file_id.isdecimal():
+            raise ValueError("Only file_id is accepted for submission attachments")
+
+        result = await self.db.execute(
+            select(StoredFile).where(StoredFile.id == int(raw_file_id))
+        )
+        stored_file = result.scalar_one_or_none()
+        if stored_file is None:
+            raise ValueError("File does not exist")
+        if student.role != "ADMIN" and stored_file.uploader_user_id != student.id:
+            raise ValueError("No permission to use this file")
+        if stored_file.category == "ASSIGNMENT_ATTACHMENT":
+            raise ValueError("Assignment attachment cannot be used as a submission")
+        if stored_file.course_id is not None and stored_file.course_id != assignment.course_id:
+            raise ValueError("File does not belong to this course")
+        if stored_file.assignment_id is not None and stored_file.assignment_id != assignment.id:
+            raise ValueError("File does not belong to this assignment")
+        if stored_file.submission_id is not None:
+            if existing_submission is None or stored_file.submission_id != existing_submission.id:
+                raise ValueError("File is already bound to another submission")
+        return stored_file
+
+    async def _bind_submission_file(
+        self,
+        stored_file: Optional[StoredFile],
+        assignment: Assignment,
+        submission: Submission,
+    ) -> Optional[str]:
+        if stored_file is None:
+            return None
+        stored_file.category = "SUBMISSION_ATTACHMENT"
+        stored_file.course_id = assignment.course_id
+        stored_file.assignment_id = assignment.id
+        stored_file.submission_id = submission.id
+        await self.db.flush()
+        return f"{stored_file.id}::{stored_file.original_name}"
+
     async def submit(
         self,
         assignment_id: int,
@@ -214,24 +262,27 @@ class AssignmentService:
             )
         )
         existing_submission = existing.scalar_one_or_none()
+        stored_file = await self._get_submission_file(
+            file_path, assignment, student, existing_submission
+        )
 
-        if not content and not file_path and not (
+        if not content and stored_file is None and not (
             existing_submission and existing_submission.file_paths
         ):
             raise ValueError("提交内容或附件至少填写一项")
-
-        stored = None
-        if file_path:
-            stored = file_path + ("::" + file_name if file_name else "")
 
         if existing_submission is not None:
             if existing_submission.status == "GRADED":
                 raise ValueError("作业已评分，不能重复提交")
             existing_submission.content = content
-            existing_submission.file_name = file_name or existing_submission.file_name
-            existing_submission.file_paths = stored or existing_submission.file_paths
             existing_submission.status = "SUBMITTED"
             existing_submission.submitted_at = datetime.now()
+            stored = await self._bind_submission_file(
+                stored_file, assignment, existing_submission
+            )
+            if stored:
+                existing_submission.file_name = stored_file.original_name
+                existing_submission.file_paths = stored
             await self.db.flush()
             if assignment.peer_review_enabled:
                 await self._generate_peer_reviews(assignment)
@@ -241,13 +292,18 @@ class AssignmentService:
             assignment_id=assignment_id,
             student_id=student.id,
             content=content,
-            file_name=file_name,
-            file_paths=stored,
+            file_name=stored_file.original_name if stored_file else file_name,
+            file_paths=None,
             status="SUBMITTED",
             submitted_at=datetime.now(),
         )
         self.db.add(submission)
         await self.db.flush()
+        stored = await self._bind_submission_file(stored_file, assignment, submission)
+        if stored:
+            submission.file_paths = stored
+            submission.file_name = stored_file.original_name
+            await self.db.flush()
         if assignment.peer_review_enabled:
             await self._generate_peer_reviews(assignment)
         return submission

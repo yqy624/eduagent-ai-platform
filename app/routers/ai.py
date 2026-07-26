@@ -2,13 +2,13 @@
 import json
 import time
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import get_current_user, require_teacher, require_student
-from app.models.models import User
+from app.models.models import Assignment, Course, Enrollment, Submission, User
 from app.models.ai_models import AiRun
 from app.schemas.ai import (
     DiagnosisResponse,
@@ -29,6 +29,81 @@ from ai.workflows.grading_graph import build_grading_graph, GradingState
 router = APIRouter(prefix="/api/ai", tags=["AI 智能助手"])
 
 
+async def _ensure_course_access(db: AsyncSession, course_id: int, user: User) -> Course:
+    result = await db.execute(select(Course).where(Course.id == course_id))
+    course = result.scalar_one_or_none()
+    if course is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    if user.role == "ADMIN":
+        return course
+    if user.role == "TEACHER" and course.teacher_id == user.id:
+        return course
+    if user.role == "STUDENT":
+        enrolled = await db.execute(
+            select(Enrollment.id).where(
+                Enrollment.course_id == course_id,
+                Enrollment.student_id == user.id,
+            )
+        )
+        if enrolled.scalar_one_or_none() is not None:
+            return course
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No permission for this course")
+
+
+async def _ensure_student_ai_access(
+    db: AsyncSession,
+    student_id: int,
+    user: User,
+    course_id: Optional[int] = None,
+) -> None:
+    if user.role == "ADMIN":
+        return
+    if user.role == "STUDENT":
+        if student_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No permission for this student")
+        if course_id is not None:
+            await _ensure_course_access(db, course_id, user)
+        return
+    if user.role == "TEACHER":
+        if course_id is not None:
+            course = await _ensure_course_access(db, course_id, user)
+            enrolled = await db.execute(
+                select(Enrollment.id).where(
+                    Enrollment.course_id == course.id,
+                    Enrollment.student_id == student_id,
+                )
+            )
+        else:
+            enrolled = await db.execute(
+                select(Enrollment.id)
+                .join(Course, Course.id == Enrollment.course_id)
+                .where(Enrollment.student_id == student_id, Course.teacher_id == user.id)
+                .limit(1)
+            )
+        if enrolled.scalar_one_or_none() is not None:
+            return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No permission for this student")
+
+
+async def _ensure_teacher_submission_access(
+    db: AsyncSession,
+    submission_id: int,
+    user: User,
+) -> None:
+    result = await db.execute(
+        select(Submission, Assignment, Course)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .join(Course, Course.id == Assignment.course_id)
+        .where(Submission.id == submission_id)
+    )
+    row = result.first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    _, _, course = row
+    if user.role != "ADMIN" and course.teacher_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No permission for this submission")
+
+
 @router.post("/courses/{course_id}/qa")
 async def course_qa(
     course_id: int,
@@ -37,6 +112,7 @@ async def course_qa(
     db: AsyncSession = Depends(get_db),
 ):
     """课程 RAG 问答（使用 Ollama LLM + 数据库文档切片）"""
+    await _ensure_course_access(db, course_id, user)
     service = AiToolService(db)
     start = time.time()
 
@@ -124,6 +200,7 @@ async def diagnose_student(
     db: AsyncSession = Depends(get_db),
 ):
     """学情诊断"""
+    await _ensure_student_ai_access(db, student_id, user, course_id)
     service = AiToolService(db)
     start = time.time()
 
@@ -165,6 +242,7 @@ async def generate_learning_plan(
     db: AsyncSession = Depends(get_db),
 ):
     """生成学习计划（LangGraph Agent）"""
+    await _ensure_student_ai_access(db, student_id, user, course_id)
     service = AiToolService(db)
     start = time.time()
 
@@ -240,6 +318,7 @@ async def grade_suggestion(
     db: AsyncSession = Depends(get_db),
 ):
     """AI 批改建议（LangGraph Agent）"""
+    await _ensure_teacher_submission_access(db, submission_id, user)
     service = AiToolService(db)
     from ai.tools.assignment_tools import AssignmentTools
     from ai.tools.grade_tools import GradeTools

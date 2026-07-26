@@ -101,8 +101,9 @@ async def submit_assignment(
     """提交作业"""
     service = StudentService(db)
     try:
+        file_ref = str(req.file_id) if req.file_id is not None else req.file_path
         data = await service.submit_assignment(
-            assignment_id, user, req.content, req.file_path, req.file_name
+            assignment_id, user, req.content, file_ref, req.file_name
         )
         return ApiResponse.ok(data=data, message="提交成功")
     except ValueError as e:
