@@ -785,6 +785,212 @@ body[data-role="student"] .role-identity-marker {
   grid-column: span 1;
 }
 
+.teacher-course-table,
+.teacher-student-table,
+.teacher-assignment-table,
+.teacher-peer-table,
+.teacher-grading-table,
+.student-course-table,
+.student-assignment-table,
+.student-peer-table,
+.student-grade-table,
+.student-plan-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.teacher-course-table {
+  min-width: 1120px;
+}
+
+.teacher-student-table {
+  min-width: 920px;
+}
+
+.teacher-course-table th,
+.teacher-course-table td,
+.teacher-student-table th,
+.teacher-student-table td,
+.teacher-assignment-table th,
+.teacher-assignment-table td,
+.teacher-peer-table th,
+.teacher-peer-table td,
+.teacher-grading-table th,
+.teacher-grading-table td,
+.student-course-table th,
+.student-course-table td,
+.student-assignment-table th,
+.student-assignment-table td,
+.student-peer-table th,
+.student-peer-table td,
+.student-grade-table th,
+.student-grade-table td,
+.student-plan-table th,
+.student-plan-table td {
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.teacher-course-table th:nth-child(1),
+.teacher-course-table td:nth-child(1) { width: 220px; }
+.teacher-course-table th:nth-child(2),
+.teacher-course-table td:nth-child(2) { width: auto; }
+.teacher-course-table th:nth-child(3),
+.teacher-course-table td:nth-child(3) { width: 180px; }
+.teacher-course-table th:nth-child(4),
+.teacher-course-table td:nth-child(4),
+.teacher-course-table th:nth-child(5),
+.teacher-course-table td:nth-child(5) { width: 100px; text-align: center; }
+.teacher-course-table th:nth-child(6),
+.teacher-course-table td:nth-child(6) { width: 170px; text-align: center; }
+
+.teacher-student-table th:nth-child(1),
+.teacher-student-table td:nth-child(1) { width: 280px; }
+.teacher-student-table th:nth-child(2),
+.teacher-student-table td:nth-child(2) { width: 220px; }
+.teacher-student-table th:nth-child(3),
+.teacher-student-table td:nth-child(3) { width: auto; }
+
+.teacher-assignment-table {
+  min-width: 1180px;
+}
+
+.teacher-assignment-table th:nth-child(1),
+.teacher-assignment-table td:nth-child(1) { width: 300px; }
+.teacher-assignment-table th:nth-child(2),
+.teacher-assignment-table td:nth-child(2) { width: 230px; }
+.teacher-assignment-table th:nth-child(3),
+.teacher-assignment-table td:nth-child(3) { width: 90px; text-align: center; }
+.teacher-assignment-table th:nth-child(4),
+.teacher-assignment-table td:nth-child(4),
+.teacher-assignment-table th:nth-child(5),
+.teacher-assignment-table td:nth-child(5) { width: 120px; text-align: center; }
+.teacher-assignment-table th:nth-child(6),
+.teacher-assignment-table td:nth-child(6) { width: 110px; text-align: center; }
+.teacher-assignment-table th:nth-child(7),
+.teacher-assignment-table td:nth-child(7) { width: 150px; text-align: center; }
+
+.teacher-peer-table {
+  min-width: 1180px;
+}
+
+.teacher-peer-table th:nth-child(1),
+.teacher-peer-table td:nth-child(1) { width: 240px; }
+.teacher-peer-table th:nth-child(2),
+.teacher-peer-table td:nth-child(2) { width: 110px; text-align: center; }
+.teacher-peer-table th:nth-child(3),
+.teacher-peer-table td:nth-child(3) { width: 260px; }
+.teacher-peer-table th:nth-child(4),
+.teacher-peer-table td:nth-child(4) { width: 260px; }
+.teacher-peer-table th:nth-child(5),
+.teacher-peer-table td:nth-child(5) { width: auto; }
+.teacher-peer-table th:nth-child(6),
+.teacher-peer-table td:nth-child(6) { width: 120px; text-align: center; }
+
+.teacher-grading-table {
+  min-width: 1040px;
+}
+
+.teacher-grading-table th:nth-child(1),
+.teacher-grading-table td:nth-child(1) { width: 150px; }
+.teacher-grading-table th:nth-child(2),
+.teacher-grading-table td:nth-child(2) { width: auto; }
+.teacher-grading-table th:nth-child(3),
+.teacher-grading-table td:nth-child(3) { width: 120px; text-align: center; }
+.teacher-grading-table th:nth-child(4),
+.teacher-grading-table td:nth-child(4) { width: 90px; text-align: center; }
+.teacher-grading-table th:nth-child(5),
+.teacher-grading-table td:nth-child(5) { width: 170px; text-align: center; }
+
+.student-course-table {
+  min-width: 1120px;
+}
+
+.student-course-table th:nth-child(1),
+.student-course-table td:nth-child(1) { width: 240px; }
+.student-course-table th:nth-child(2),
+.student-course-table td:nth-child(2) { width: 150px; }
+.student-course-table th:nth-child(3),
+.student-course-table td:nth-child(3) { width: 190px; }
+.student-course-table th:nth-child(4),
+.student-course-table td:nth-child(4) { width: 90px; text-align: center; }
+.student-course-table th:nth-child(5),
+.student-course-table td:nth-child(5) { width: auto; }
+.student-course-table th:nth-child(6),
+.student-course-table td:nth-child(6) { width: 170px; text-align: center; }
+
+.student-assignment-table {
+  min-width: 1240px;
+}
+
+.student-assignment-table th:nth-child(1),
+.student-assignment-table td:nth-child(1) { width: 230px; }
+.student-assignment-table th:nth-child(2),
+.student-assignment-table td:nth-child(2) { width: 190px; }
+.student-assignment-table th:nth-child(3),
+.student-assignment-table td:nth-child(3) { width: 80px; text-align: center; }
+.student-assignment-table th:nth-child(4),
+.student-assignment-table td:nth-child(4) { width: 90px; text-align: center; }
+.student-assignment-table th:nth-child(5),
+.student-assignment-table td:nth-child(5) { width: auto; }
+.student-assignment-table th:nth-child(6),
+.student-assignment-table td:nth-child(6) { width: 190px; text-align: center; }
+.student-assignment-table td:nth-child(6) .btn {
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.student-peer-table {
+  min-width: 1160px;
+}
+
+.student-peer-table th:nth-child(1),
+.student-peer-table td:nth-child(1) { width: 120px; text-align: center; }
+.student-peer-table th:nth-child(2),
+.student-peer-table td:nth-child(2) { width: 160px; }
+.student-peer-table th:nth-child(3),
+.student-peer-table td:nth-child(3) { width: auto; }
+.student-peer-table th:nth-child(4),
+.student-peer-table td:nth-child(4) { width: 90px; text-align: center; }
+.student-peer-table th:nth-child(5),
+.student-peer-table td:nth-child(5) { width: 260px; }
+.student-peer-table th:nth-child(6),
+.student-peer-table td:nth-child(6) { width: 140px; text-align: center; }
+
+.student-grade-table {
+  min-width: 1280px;
+}
+
+.student-grade-table th:nth-child(1),
+.student-grade-table td:nth-child(1) { width: 180px; }
+.student-grade-table th:nth-child(2),
+.student-grade-table td:nth-child(2) { width: 200px; }
+.student-grade-table th:nth-child(3),
+.student-grade-table td:nth-child(3) { width: 110px; text-align: center; }
+.student-grade-table th:nth-child(4),
+.student-grade-table td:nth-child(4) { width: auto; }
+.student-grade-table th:nth-child(5),
+.student-grade-table td:nth-child(5),
+.student-grade-table th:nth-child(6),
+.student-grade-table td:nth-child(6),
+.student-grade-table th:nth-child(7),
+.student-grade-table td:nth-child(7) { width: 100px; text-align: center; }
+.student-grade-table th:nth-child(8),
+.student-grade-table td:nth-child(8) { width: 240px; }
+
+.student-plan-table {
+  min-width: 920px;
+}
+
+.student-plan-table th:nth-child(1),
+.student-plan-table td:nth-child(1) { width: 180px; }
+.student-plan-table th:nth-child(2),
+.student-plan-table td:nth-child(2) { width: auto; }
+.student-plan-table th:nth-child(3),
+.student-plan-table td:nth-child(3) { width: 110px; text-align: center; }
+.student-plan-table th:nth-child(4),
+.student-plan-table td:nth-child(4) { width: 130px; text-align: center; }
+
 .admin-course-table {
   min-width: 1120px;
   table-layout: fixed;

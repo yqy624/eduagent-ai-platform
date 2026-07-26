@@ -140,7 +140,8 @@
           <div class="col-md-6"><label class="form-label" for="assignCourse">所属课程</label><select id="assignCourse" class="form-select"></select></div>
           <div class="col-md-6"><label class="form-label" for="assignDue">截止日期</label><input id="assignDue" type="datetime-local" class="form-control"></div>
           <div class="col-md-6"><label class="form-label" for="assignPoints">作业满分</label><input id="assignPoints" type="number" class="form-control" value="100"></div>
-          <div class="col-12"><label class="form-label" for="assignDesc">作业要求</label><textarea id="assignDesc" class="form-control" rows="4" placeholder="请输入作业要求和提交内容说明"></textarea></div>
+          <div class="col-12"><label class="form-label" for="assignDesc">作业要求</label><textarea id="assignDesc" class="form-control" rows="3" placeholder="请输入作业要求和提交内容说明"></textarea></div>
+          <div class="col-12"><label class="form-label" for="assignDetail">作业详情</label><textarea id="assignDetail" class="form-control" rows="5" placeholder="请输入详细背景、步骤、评分标准、提交格式等内容，供学生查看和 RAG 索引使用"></textarea></div>
         </div>
       </div>
       <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="publishAssignment()">发布</button></div>
@@ -476,7 +477,7 @@ async function loadCourses() {
     syncAssignmentCourseOptions();
     return;
   }
-  html += '<div class="table-wrap"><table class="table table-hover align-middle"><thead><tr><th>课程</th><th>描述</th><th>时间</th><th>学分</th><th>学生数</th><th>操作</th></tr></thead><tbody>';
+  html += '<div class="table-wrap"><table class="table table-hover align-middle teacher-course-table"><thead><tr><th>课程</th><th>描述</th><th>时间</th><th>学分</th><th>学生数</th><th>操作</th></tr></thead><tbody>';
   courses.forEach(function(c) {
     html += '<tr><td><span class="fw-semibold">' + App.escapeHtml(c.name || '未命名课程') + '</span></td><td>' + App.escapeHtml(c.description || '暂无课程描述') + '</td><td>' + App.escapeHtml(c.schedule || '时间待定') + '</td><td>' + (c.credits != null ? c.credits : '未设置') + '</td><td>' + (c.enrolledCount || 0) + '/' + (c.maxStudents || 50) + '</td><td><button class="btn btn-outline-primary btn-sm me-1" onclick="openCourseModal(' + c.id + ')"><i class="fa-solid fa-pen"></i> 编辑</button><button class="btn btn-outline-danger btn-sm" onclick="deleteCourse(' + c.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
   });
@@ -542,7 +543,7 @@ async function loadStudents() {
       continue;
     }
     hasStudents = true;
-    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6><table class="table table-sm table-hover align-middle"><thead><tr><th>学生姓名</th><th>用户名</th><th>邮箱</th></tr></thead><tbody>';
+    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6><table class="table table-sm table-hover align-middle teacher-student-table"><thead><tr><th>学生姓名</th><th>用户名</th><th>邮箱</th></tr></thead><tbody>';
     students.forEach(function(s) {
       html += '<tr><td>' + App.escapeHtml(s.displayName || '未填写姓名') + '</td><td>' + App.escapeHtml(s.username || '-') + '</td><td>' + App.escapeHtml(s.email || '未填写邮箱') + '</td></tr>';
     });
@@ -567,7 +568,7 @@ async function loadAssignments() {
       continue;
     }
     hasData = true;
-    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6><table class="table table-sm"><thead><tr><th>标题</th><th>截止</th><th>满分</th><th>状态</th><th>互评</th><th>提交数</th><th>操作</th></tr></thead><tbody>';
+    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6><table class="table table-sm align-middle teacher-assignment-table"><thead><tr><th>标题</th><th>截止</th><th>满分</th><th>状态</th><th>互评</th><th>提交数</th><th>操作</th></tr></thead><tbody>';
     list.forEach(function(a) {
       var peerStatus = a.peerReviewEnabled ? '<span class="badge-soft bg-info bg-opacity-10 text-info">已开启</span>' : '<span class="badge-soft bg-secondary bg-opacity-10 text-secondary">未开启</span>';
       var workStatus = a.status === 'CLOSED' ? '<span class="badge-soft bg-warning bg-opacity-10 text-warning">已截止</span>' : '<span class="badge-soft bg-success bg-opacity-10 text-success">已发布</span>';
@@ -592,6 +593,7 @@ function openAssignmentModal(id) {
   assignDue.value = assignment && assignment.dueDate ? String(assignment.dueDate).slice(0, 16) : "";
   assignPoints.value = assignment ? (assignment.totalPoints || 100) : 100;
   assignDesc.value = assignment ? (assignment.description || "") : "";
+  assignDetail.value = assignment ? (assignment.detail || "") : "";
   new bootstrap.Modal(assignModal).show();
 }
 
@@ -600,6 +602,7 @@ async function publishAssignment() {
     var payload = {
       title: assignTitle.value.trim(),
       description: assignDesc.value.trim(),
+      detail: assignDetail.value.trim(),
       due_date: assignDue.value,
       total_points: Number(assignPoints.value || 100),
       course_id: Number(assignCourse.value)
@@ -644,7 +647,7 @@ async function loadPeerReviewManage() {
     var assignments = await api("/teacher/courses/" + c.id + "/assignments");
     if (!assignments.length) continue;
     hasData = true;
-    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name) + '</h6><table class="table table-sm align-middle"><thead><tr><th>作业</th><th>状态</th><th>窗口</th><th>规则</th><th>参与统计</th><th></th></tr></thead><tbody>';
+    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name) + '</h6><table class="table table-sm align-middle teacher-peer-table"><thead><tr><th>作业</th><th>状态</th><th>窗口</th><th>规则</th><th>参与统计</th><th></th></tr></thead><tbody>';
     for (var ai = 0; ai < assignments.length; ai++) {
       var a = assignments[ai];
       var overview = await api('/teacher/assignments/' + a.id + '/peer-review');
@@ -700,7 +703,7 @@ async function loadGrading() {
       var subs = await api("/teacher/assignments/" + a.id + "/submissions");
       if (!subs.length) continue;
       hasGrading = true;
-      html += '<div class="table-wrap mb-3"><h6 class="mb-2"><i class="fa-solid fa-file me-2" style="color:var(--accent-2)"></i>' + App.escapeHtml(c.name || '未命名课程') + ' / ' + App.escapeHtml(a.title || '未命名作业') + '</h6><table class="table table-sm"><thead><tr><th>学生</th><th>提交内容</th><th>状态</th><th>分数</th><th></th></tr></thead><tbody>';
+      html += '<div class="table-wrap mb-3"><h6 class="mb-2"><i class="fa-solid fa-file me-2" style="color:var(--accent-2)"></i>' + App.escapeHtml(c.name || '未命名课程') + ' / ' + App.escapeHtml(a.title || '未命名作业') + '</h6><table class="table table-sm align-middle teacher-grading-table"><thead><tr><th>学生</th><th>提交内容</th><th>状态</th><th>分数</th><th></th></tr></thead><tbody>';
       subs.forEach(function(s) {
         var submittedContent = s.content ? App.escapeHtml(s.content) : '仅附件提交';
         var attachments = App.parseStoredFiles(s.filePaths);

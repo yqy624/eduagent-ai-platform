@@ -25,6 +25,7 @@ class AssignmentTools:
             "course_id": a.course_id,
             "title": a.title,
             "description": a.description,
+            "detail": a.detail,
             "due_date": a.due_date.isoformat() if a.due_date else None,
             "total_points": a.total_points,
             "created_at": a.created_at.isoformat() if a.created_at else None,
@@ -43,6 +44,7 @@ class AssignmentTools:
                 "id": a.id,
                 "title": a.title,
                 "description": a.description,
+                "detail": a.detail,
                 "due_date": a.due_date.isoformat() if a.due_date else None,
                 "total_points": a.total_points,
             }

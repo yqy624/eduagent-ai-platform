@@ -226,10 +226,12 @@ def _build_rag_context(citations: List[Dict[str, Any]]) -> str:
 def _assignment_material_text(assignment: Assignment) -> str:
     due_date = assignment.due_date.isoformat() if assignment.due_date else "未设置"
     total_points = assignment.total_points if assignment.total_points is not None else "未设置"
-    description = (assignment.description or "暂无说明").strip()
+    description = (assignment.description or "暂无要求").strip()
+    detail = (assignment.detail or "暂无详情").strip()
     return (
         f"作业标题：{assignment.title}\n"
-        f"作业说明：{description}\n"
+        f"作业要求：{description}\n"
+        f"作业详情：{detail}\n"
         f"截止时间：{due_date}\n"
         f"总分：{total_points}"
     )

@@ -90,6 +90,7 @@ class Assignment(Base):
     attachment_paths: Mapped[Optional[str]] = mapped_column(String(500))
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(6))
     description: Mapped[Optional[str]] = mapped_column(Text)
+    detail: Mapped[Optional[str]] = mapped_column(Text)
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(6))
     title: Mapped[str] = mapped_column(String(200))
     total_points: Mapped[Optional[int]] = mapped_column(Integer)

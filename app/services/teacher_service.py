@@ -200,6 +200,7 @@ class TeacherService:
         return {
             "id": assignment.id, "title": assignment.title,
             "description": assignment.description,
+            "detail": assignment.detail,
             "dueDate": assignment.due_date.isoformat() if assignment.due_date else None,
             "totalPoints": assignment.total_points,
             "courseId": assignment.course_id,

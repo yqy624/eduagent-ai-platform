@@ -55,6 +55,7 @@ class AssignmentCreate(BaseModel):
     course_id: int
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
+    detail: Optional[str] = None
     due_date: Optional[str] = None
     total_points: Optional[int] = None
     attachment_paths: Optional[str] = None
@@ -70,6 +71,7 @@ class AssignmentCreate(BaseModel):
 class AssignmentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
+    detail: Optional[str] = None
     due_date: Optional[str] = None
     total_points: Optional[int] = Field(None, ge=0)
     attachment_paths: Optional[str] = None
@@ -89,6 +91,7 @@ class AssignmentResponse(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
+    detail: Optional[str] = None
     due_date: Optional[str] = None
     total_points: Optional[int] = None
     course_id: int

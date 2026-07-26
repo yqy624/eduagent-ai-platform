@@ -207,6 +207,7 @@ class StudentService:
                 "id": a.id,
                 "title": a.title,
                 "description": a.description,
+                "detail": a.detail,
                 "dueDate": a.due_date.isoformat() if a.due_date else None,
                 "totalPoints": a.total_points,
                 "courseId": a.course_id,

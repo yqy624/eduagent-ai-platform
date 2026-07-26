@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.database import ensure_runtime_schema
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -39,6 +40,7 @@ async def lifespan(app: FastAPI):
     """应用生命周期"""
     print(f"🚀 EduAgent 智慧教育 Agent 平台启动中...")
     print(f"📚 数据库: {settings.db_host}:{settings.db_port}/{settings.db_name}")
+    await ensure_runtime_schema()
     if not AI_AVAILABLE:
         print("⚡ AI 功能未加载，仅核心业务接口可用")
     yield

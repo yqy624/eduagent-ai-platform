@@ -101,6 +101,7 @@ class AssignmentService:
             course_id=req.course_id,
             title=req.title,
             description=req.description,
+            detail=req.detail,
             due_date=due_date,
             total_points=req.total_points,
             teacher_id=teacher.id,
