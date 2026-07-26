@@ -1,4 +1,5 @@
 """AI 工具服务 — 封装 AI Agent 可调用的业务逻辑"""
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from sqlalchemy import select, func
@@ -88,6 +89,22 @@ class AiToolService:
         self.db.add(call)
         await self.db.flush()
 
+    async def log_tool_call_json(
+        self, run_id: Optional[int], tool_name: str,
+        input_data: Any = None, output_data: Any = None,
+        latency_ms: int = 0, error: Optional[str] = None
+    ):
+        if not run_id:
+            return
+        await self.log_tool_call(
+            run_id=run_id,
+            tool_name=tool_name,
+            input_data=json.dumps(input_data or {}, ensure_ascii=False, default=str),
+            output_data=json.dumps(output_data or {}, ensure_ascii=False, default=str),
+            latency_ms=latency_ms,
+            error=error,
+        )
+
     # ===== RAG 问答日志 =====
     async def log_qa(
         self, course_id: int, user_id: int, question: str,
@@ -167,12 +184,7 @@ class AiToolService:
         if run is None:
             return None
 
-        calls_result = await self.db.execute(
-            select(AiToolCall)
-            .where(AiToolCall.run_id == run_id)
-            .order_by(AiToolCall.created_at)
-        )
-        calls = list(calls_result.scalars().all())
+        calls = await self.get_tool_calls(run_id)
 
         return {
             "id": run.id,
@@ -187,17 +199,29 @@ class AiToolService:
             "error": run.error,
             "created_at": run.created_at.isoformat() if run.created_at else None,
             "finished_at": run.finished_at.isoformat() if run.finished_at else None,
-            "tool_calls": [
-                {
-                    "tool_name": c.tool_name,
-                    "input": c.input_json,
-                    "output": c.output_json,
-                    "latency_ms": c.latency_ms,
-                    "error": c.error,
-                }
-                for c in calls
-            ],
+            "tool_calls": calls,
         }
+
+    async def get_tool_calls(self, run_id: int) -> List[Dict[str, Any]]:
+        result = await self.db.execute(
+            select(AiToolCall)
+            .where(AiToolCall.run_id == run_id)
+            .order_by(AiToolCall.created_at)
+        )
+        calls = list(result.scalars().all())
+        return [
+            {
+                "id": c.id,
+                "run_id": c.run_id,
+                "tool_name": c.tool_name,
+                "input": c.input_json,
+                "output": c.output_json,
+                "latency_ms": c.latency_ms,
+                "error": c.error,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in calls
+        ]
 
     # ===== Agent 工具暴露 =====
     async def get_student_profile(self, student_id: int) -> Dict[str, Any]:

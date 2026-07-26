@@ -1,6 +1,8 @@
 """向量存储"""
 import hashlib
 import os
+import re
+import shutil
 from typing import Any, Dict, List, Optional, Tuple
 from langchain_core.documents import Document
 
@@ -32,8 +34,7 @@ class VectorStoreManager:
         """添加文档到向量库"""
         emb = self.embeddings
         if emb is None:
-            # 无 embedding 模型可用，写入空索引标记
-            return 0
+            raise RuntimeError("Embedding model is not configured; vector indexing is unavailable")
 
         from langchain_community.vectorstores import FAISS
 
@@ -54,7 +55,7 @@ class VectorStoreManager:
         """获取 FAISS 向量存储实例"""
         emb = self.embeddings
         if emb is None:
-            return None
+            raise RuntimeError("Embedding model is not configured; vector search is unavailable")
 
         from langchain_community.vectorstores import FAISS
 
@@ -64,7 +65,7 @@ class VectorStoreManager:
                 index_path, emb,
                 allow_dangerous_deserialization=True,
             )
-        return None
+        raise RuntimeError(f"Vector collection '{collection_name}' does not exist")
 
     def similarity_search(
         self,
@@ -75,8 +76,6 @@ class VectorStoreManager:
     ) -> List[Tuple[Document, float]]:
         """相似度搜索"""
         store = self.get_store(collection_name)
-        if store is None:
-            return []
 
         if filter:
             docs = store.similarity_search_with_score(query, k=k, filter=filter)
@@ -88,8 +87,47 @@ class VectorStoreManager:
     def delete_collection(self, collection_name: str = "course_docs"):
         index_path = self._get_faiss_index_path(collection_name)
         if os.path.exists(index_path):
-            os.remove(index_path)
+            if os.path.isdir(index_path):
+                shutil.rmtree(index_path)
+            else:
+                os.remove(index_path)
 
     @staticmethod
     def compute_content_hash(content: str) -> str:
         return hashlib.md5(content.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def lexical_similarity(query: str, content: str) -> float:
+        """Small local fallback for environments without an embedding service."""
+        query = (query or "").strip().lower()
+        content = (content or "").strip().lower()
+        if not query or not content:
+            return 0.0
+
+        if query in content:
+            return 0.95
+
+        query_tokens = set(re.findall(r"[\w\u4e00-\u9fff]+", query))
+        content_tokens = set(re.findall(r"[\w\u4e00-\u9fff]+", content))
+        query_cjk = "".join(re.findall(r"[\u4e00-\u9fff]+", query))
+        content_cjk = "".join(re.findall(r"[\u4e00-\u9fff]+", content))
+        for size in (2, 3, 4):
+            query_tokens.update(
+                query_cjk[index:index + size]
+                for index in range(max(len(query_cjk) - size + 1, 0))
+            )
+            content_tokens.update(
+                content_cjk[index:index + size]
+                for index in range(max(len(content_cjk) - size + 1, 0))
+            )
+        if not query_tokens or not content_tokens:
+            return 0.0
+
+        overlap = query_tokens & content_tokens
+        coverage = len(overlap) / max(len(query_tokens), 1)
+        jaccard = len(overlap) / max(len(query_tokens | content_tokens), 1)
+
+        char_hits = sum(1 for ch in set(query) if ch.strip() and ch in content)
+        char_score = char_hits / max(len(set(query)), 1)
+
+        return round(min(1.0, coverage * 0.65 + jaccard * 0.2 + char_score * 0.15), 4)

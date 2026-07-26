@@ -17,6 +17,7 @@ from ai.tools.grade_tools import GradeTools
 
 # ===== Agent State =====
 class GradingState(TypedDict):
+    run_id: int
     user_id: int
     submission_id: int
     role: str
@@ -33,6 +34,7 @@ class GradingState(TypedDict):
     strengths: Optional[List[str]]
     weaknesses: Optional[List[str]]
     risks: Optional[List[str]]
+    suggestion_id: Optional[int]
 
     # 人机协同
     teacher_action: Optional[str]  # ACCEPTED, MODIFIED, REJECTED
@@ -52,6 +54,15 @@ async def load_submission(state: GradingState, service: AiToolService) -> Dict:
     assignment = await service.assignment_tools.get_assignment(submission["assignment_id"])
     peer_reviews = await service.assignment_tools.get_peer_reviews_for_submission(
         state["submission_id"]
+    )
+    await service.log_tool_call_json(
+        state.get("run_id"), "load_submission",
+        {"submission_id": state["submission_id"]},
+        {
+            "assignment_id": submission.get("assignment_id"),
+            "assignment_title": assignment.get("title") if assignment else None,
+            "peer_review_count": len(peer_reviews),
+        },
     )
 
     return {
@@ -81,6 +92,11 @@ async def get_rubric(state: GradingState, service: AiToolService) -> Dict:
             {"name": "表达与规范", "weight": 0.2, "description": "语言表达和格式规范"},
         ],
     }
+    await service.log_tool_call_json(
+        state.get("run_id"), "get_rubric",
+        {"assignment_id": assignment.get("id")},
+        rubric,
+    )
 
     return {
         "rubric": rubric,
@@ -137,6 +153,20 @@ async def suggest_grade(state: GradingState, service: AiToolService) -> Dict:
     risks = []
     if content_length < 100:
         risks.append("内容过少可能存在抄袭风险，请教师核实")
+    await service.log_tool_call_json(
+        state.get("run_id"), "suggest_grade",
+        {
+            "submission_id": state["submission_id"],
+            "content_length": content_length,
+            "peer_review_count": len(peer_reviews),
+        },
+        {
+            "suggested_score": score,
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "risks": risks,
+        },
+    )
 
     return {
         "suggested_score": score,
@@ -174,6 +204,11 @@ async def generate_comment(state: GradingState, service: AiToolService) -> Dict:
         comment_parts.append("需要重点关注，建议重新学习相关内容后再提交。")
 
     comment = "\n".join(comment_parts)
+    await service.log_tool_call_json(
+        state.get("run_id"), "generate_comment",
+        {"suggested_score": suggested_score, "total_points": total_points},
+        {"comment": comment},
+    )
 
     return {
         "comment": comment,
@@ -189,15 +224,21 @@ async def wait_for_review(state: GradingState, service: AiToolService) -> Dict:
         rubric_json = json.dumps(state.get("rubric", {}), ensure_ascii=False)
         suggestion = await service.save_grading_suggestion(
             submission_id=state["submission_id"],
-            run_id=state.get("user_id", 0),
+            run_id=state.get("run_id", 0),
             suggested_score=state.get("suggested_score", 0),
             rubric_json=rubric_json,
             comment=state.get("comment", ""),
             strengths=json.dumps(state.get("strengths", []), ensure_ascii=False),
             weaknesses=json.dumps(state.get("weaknesses", []), ensure_ascii=False),
         )
+        await service.log_tool_call_json(
+            state.get("run_id"), "wait_for_review",
+            {"submission_id": state["submission_id"]},
+            {"suggestion_id": suggestion.id, "teacher_action": "PENDING"},
+        )
 
         return {
+            "suggestion_id": suggestion.id,
             "tool_trace": (state.get("tool_trace") or [])
             + [{
                 "node": "wait_for_review",

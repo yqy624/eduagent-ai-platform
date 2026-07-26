@@ -11,9 +11,11 @@ class QARequest(BaseModel):
 
 class Citation(BaseModel):
     """引用来源"""
+    document_id: Optional[int] = None
     chunk_index: Optional[int] = 0
     content: str
     score: float
+    similarity: Optional[float] = None
     source: str
     file_name: Optional[str] = None
 
@@ -23,6 +25,7 @@ class QAResponse(BaseModel):
     citations: List[Citation] = []
     confidence: float
     needs_clarification: bool = False
+    run_id: Optional[int] = None
 
 
 class DiagnosisResponse(BaseModel):
@@ -44,10 +47,14 @@ class LearningPlanResponse(BaseModel):
     exercises: List[Dict[str, Any]] = []
     total_hours: float = 0
     plan_id: Optional[int] = None
+    run_id: Optional[int] = None
+    basis: List[Dict[str, Any]] = []
 
 
 class GradingSuggestionResponse(BaseModel):
     """AI 批改建议"""
+    id: Optional[int] = None
+    run_id: Optional[int] = None
     submission_id: int
     suggested_score: float
     rubric: Dict[str, Any] = {}
@@ -55,6 +62,13 @@ class GradingSuggestionResponse(BaseModel):
     strengths: List[str] = []
     weaknesses: List[str] = []
     risks: List[str] = []
+
+
+class FeedbackUpdateRequest(BaseModel):
+    score: Optional[float] = Field(None, ge=0)
+    comment: Optional[str] = None
+    rubric: Optional[Dict[str, Any]] = None
+    action: Optional[str] = Field(None, pattern="^(MODIFIED|REJECTED)$")
 
 
 class AgentRunResponse(BaseModel):

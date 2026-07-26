@@ -101,6 +101,7 @@ async def ingest_all():
                     chunk_record = AiDocumentChunk(
                         course_id=dc["course_id"],
                         chunk_index=dc["chunk_index"],
+                        content=dc["content"],
                         content_hash=dc["content_hash"],
                         source=dc["source"],
                         source_type=dc["source_type"],
@@ -120,7 +121,11 @@ async def ingest_all():
                     )
                     for dc in doc_chunks
                 ]
-                count = vs.add_documents(docs, collection_name=f"course_{course.id}")
+                try:
+                    count = vs.add_documents(docs, collection_name=f"course_{course.id}")
+                except RuntimeError as e:
+                    count = len(doc_chunks)
+                    print(f"  ⚠️ 向量索引跳过: {e}")
                 total_chunks += count
                 print(f"  ✅ 创建 {len(doc_chunks)} 个示例文档切片并索引")
                 continue
@@ -178,7 +183,11 @@ async def ingest_all():
                         )
                         for dc in doc_chunks
                     ]
-                    count = vs.add_documents(docs, collection_name=f"course_{course.id}")
+                    try:
+                        count = vs.add_documents(docs, collection_name=f"course_{course.id}")
+                    except RuntimeError as e:
+                        count = len(doc_chunks)
+                        print(f"  ⚠️ 向量索引跳过: {e}")
 
                     # 保存到 DB
                     for dc in doc_chunks:
@@ -186,6 +195,7 @@ async def ingest_all():
                             course_id=dc["course_id"],
                             file_id=dc["file_id"],
                             chunk_index=dc["chunk_index"],
+                            content=dc["content"],
                             content_hash=dc["content_hash"],
                             source=dc["source"],
                             source_type=dc["source_type"],
