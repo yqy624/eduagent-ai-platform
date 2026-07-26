@@ -9,16 +9,25 @@
   <script src="/static/js/echarts.min.js?v=20260705"></script>
   <link href="/static/css/app.css?v=20260705" rel="stylesheet">
   <style>
-    .quick-action-grid,.monitor-metric-grid,.todo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+    .quick-action-grid,.monitor-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
     .quick-action-btn{display:flex;align-items:center;gap:10px;justify-content:center;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--bg-card);box-shadow:var(--shadow);color:var(--text-main);font-weight:600}
     .quick-action-btn:hover{transform:translateY(-1px);border-color:var(--accent);color:var(--accent)}
-    .todo-item,.monitor-mini-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
-    .todo-item{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer}
+    .monitor-mini-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
     .course-batch-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
     .monitor-mini-card.alert{border-color:#ef4444;background:rgba(239,68,68,.06)}
     .metric-value.alert{color:#dc2626;font-weight:700}
     .rank-list{display:flex;flex-direction:column;gap:12px}
     .rank-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg-soft)}
+    .admin-priority-list,.role-summary-list{display:flex;flex-direction:column;gap:12px}
+    .admin-priority-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-soft)}
+    .admin-priority-copy{display:flex;align-items:center;gap:12px;min-width:0}
+    .admin-priority-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+    .role-summary-item{padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-soft)}
+    .role-summary-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .role-summary-meta{display:flex;align-items:center;gap:10px;min-width:0}
+    .role-dot{width:10px;height:10px;border-radius:999px;flex:0 0 auto}
+    .role-progress{height:8px;border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden}
+    .role-progress > span{display:block;height:100%;border-radius:999px}
     .toolbar.flex-wrap{display:flex;flex-wrap:wrap;gap:12px}
     .modal .form-text{font-size:12px}
     .overview-summary-card{grid-column:1 / -1}
@@ -76,11 +85,10 @@
         <div class="quick-action-grid" id="quickActionGrid"></div>
       </div>
       <div class="dashboard-chart-grid">
-        <div class="section-card dashboard-card-main"><div class="section-head"><h5 class="mb-0">近 7 天访问量</h5></div><div id="chartVisits" style="height:320px"></div></div>
-        <div class="section-card dashboard-card-side"><div class="section-head"><h5 class="mb-0">用户角色分布</h5></div><div id="chartRoles" style="height:320px"></div></div>
+        <div class="section-card dashboard-card-main"><div class="section-head"><h5 class="mb-0">运营优先级</h5><span class="metric-muted">按影响面排序的管理动作</span></div><div id="adminPriorityPanel"></div></div>
+        <div class="section-card dashboard-card-side"><div class="section-head"><h5 class="mb-0">用户角色分布</h5></div><div id="chartRoles"></div></div>
         <div class="section-card dashboard-card-side"><div class="section-head"><h5 class="mb-0">热门课程 Top5</h5></div><div id="topCoursesRank" class="rank-list"></div></div>
         <div class="section-card dashboard-card-main"><div class="section-head"><h5 class="mb-0">活动面板</h5><button class="btn btn-primary btn-sm" onclick="openActivityModal()">发布活动</button></div><div id="activityPanel"></div></div>
-        <div class="section-card dashboard-card-side"><div class="section-head"><h5 class="mb-0">待办提醒</h5></div><div class="todo-grid" id="todoGrid"></div></div>
       </div>
       <div class="overview-grid mt-3" id="overviewExtra"></div>
     </section>
@@ -260,7 +268,7 @@ function hasEcharts() {
 }
 function resizeVisibleCharts() {
   requestAnimationFrame(function() {
-    ["chartVisits", "chartRoles", "monitorResourceChart", "monitorServiceChart", "monitorErrorChart"].forEach(function(id) {
+    ["monitorResourceChart", "monitorServiceChart", "monitorErrorChart"].forEach(function(id) {
       var el = document.getElementById(id);
       if (!el || !hasEcharts()) return;
       var chart = echarts.getInstanceByDom(el);
@@ -418,27 +426,27 @@ function loadDashboard() {
   }).catch(function(err) {
     document.getElementById("kpiGrid").innerHTML = renderEmptyPanel('概览加载失败', err.message || '暂时无法加载管理员概览数据。', false);
     document.getElementById("quickActionGrid").innerHTML = '';
-    document.getElementById("todoGrid").innerHTML = renderEmptyPanel('暂无待办事项', '管理员概览加载失败，请稍后重试。', true);
+    document.getElementById("adminPriorityPanel").innerHTML = renderEmptyPanel('暂无运营优先级', '管理员概览加载失败，请稍后重试。', false);
     document.getElementById("topCoursesRank").innerHTML = renderEmptyPanel('暂无课程排行', '管理员概览加载失败，请稍后重试。', true);
     document.getElementById("activityPanel").innerHTML = renderEmptyPanel('暂无活动记录', '管理员概览加载失败，请稍后重试。', false);
     document.getElementById("overviewExtra").innerHTML = '';
-    renderVisitChart([]);
     renderRoleChart([]);
     console.error(err);
   });
 }
 
 function renderDashboard(data) {
+  data = data || {};
   document.getElementById("kpiGrid").innerHTML = [
-    card("总用户数", data.totalUsers, "fa-users", "var(--accent)"),
-    card("学生人数", data.totalStudents, "fa-user-graduate", "var(--accent-2)"),
-    card("教师人数", data.totalTeachers, "fa-chalkboard-user", "var(--accent-3)"),
-    card("课程数量", data.totalCourses, "fa-book-open", "var(--accent-4)"),
-    card("总选课人次", data.totalEnrollments, "fa-list-check", "#0ea5e9"),
-    card("今日活跃用户", data.todayActiveUsers, "fa-bolt", "#10b981"),
-    card("本周新增课程", data.weeklyNewCourses, "fa-layer-group", "#8b5cf6"),
-    card("本周新增用户", data.weeklyNewUsers, "fa-user-plus", "#f59e0b"),
-    card("待审核事项", data.pendingReviewCount, "fa-hourglass-half", "#ef4444")
+    card("总用户数", getDashboardField(data, "totalUsers", "total_users", 0), "fa-users", "var(--accent)"),
+    card("学生人数", getDashboardField(data, "totalStudents", "total_students", 0), "fa-user-graduate", "var(--accent-2)"),
+    card("教师人数", getDashboardField(data, "totalTeachers", "total_teachers", 0), "fa-chalkboard-user", "var(--accent-3)"),
+    card("课程数量", getDashboardField(data, "totalCourses", "total_courses", 0), "fa-book-open", "var(--accent-4)"),
+    card("总选课人次", getDashboardField(data, "totalEnrollments", "total_enrollments", 0), "fa-list-check", "#0ea5e9"),
+    card("今日活跃用户", getDashboardField(data, "todayActiveUsers", "today_active_users", 0), "fa-bolt", "#10b981"),
+    card("本周新增课程", getDashboardField(data, "weeklyNewCourses", "weekly_new_courses", 0), "fa-layer-group", "#8b5cf6"),
+    card("本周新增用户", getDashboardField(data, "weeklyNewUsers", "weekly_new_users", 0), "fa-user-plus", "#f59e0b"),
+    card("待审核事项", getDashboardField(data, "pendingReviewCount", "pending_review_count", 0), "fa-hourglass-half", "#ef4444")
   ].join("");
 
   document.getElementById("quickActionGrid").innerHTML = [
@@ -449,30 +457,41 @@ function renderDashboard(data) {
     quickAction("导出用户", "fa-file-csv", "App.downloadFile('/admin/users/export','users.csv')")
   ].join("");
 
-  document.getElementById("todoGrid").innerHTML = (data.todoItems || []).length
-    ? (data.todoItems || []).map(function(item) {
-        return '<div class="todo-item" onclick="switchTab(\'' + item.tab + '\')"><div><div class="fw-semibold">' + App.escapeHtml(formatTodoText(item)) + '</div><div class="small text-muted">点击前往处理页面</div></div><i class="fa-solid fa-chevron-right text-muted"></i></div>';
-      }).join("")
-    : renderEmptyPanel('暂无待办事项', '当前没有需要立刻处理的管理任务。', true);
+  renderAdminPriorityPanel(data);
 
-  document.getElementById("topCoursesRank").innerHTML = (data.topCourses || []).length
-    ? (data.topCourses || []).map(function(item, index) {
+  var topCourses = getDashboardList(data, "topCourses", "top_courses");
+  document.getElementById("topCoursesRank").innerHTML = topCourses.length
+    ? topCourses.map(function(item, index) {
         return '<div class="rank-item"><div><div class="fw-semibold">TOP ' + (index + 1) + ' · ' + App.escapeHtml(item.name || "未命名课程") + '</div><div class="small text-muted">教师：' + App.escapeHtml(item.teacher || "未分配教师") + '</div></div><span class="badge text-bg-primary">' + (item.value || 0) + ' 人</span></div>';
       }).join("")
     : renderEmptyPanel('暂无课程排行', '课程有选课记录后，会在这里显示热门课程。', true);
 
   var overviewCards = [];
-  if ((data.pendingTeacherRequests || 0) > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">教师课程申请</div><div class="overview-stat">' + (data.pendingTeacherRequests || 0) + '</div></div>');
-  if ((data.pendingResourceUploads || 0) > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">用户上传资源</div><div class="overview-stat">' + (data.pendingResourceUploads || 0) + '</div></div>');
-  if ((data.pendingAppeals || 0) > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">用户申诉</div><div class="overview-stat">' + (data.pendingAppeals || 0) + '</div></div>');
-  if (data.storageWarningLow) overviewCards.push('<div class="monitor-mini-card alert"><div class="overview-label">存储状态</div><div class="overview-stat metric-value alert" style="font-size:18px">' + App.escapeHtml(formatStorageStatus(data)) + '</div></div>');
+  var pendingTeacherRequests = getDashboardField(data, "pendingTeacherRequests", "pending_teacher_requests", 0);
+  var pendingResourceUploads = getDashboardField(data, "pendingResourceUploads", "pending_resource_uploads", 0);
+  var pendingAppeals = getDashboardField(data, "pendingAppeals", "pending_appeals", 0);
+  if (pendingTeacherRequests > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">教师课程申请</div><div class="overview-stat">' + pendingTeacherRequests + '</div></div>');
+  if (pendingResourceUploads > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">用户上传资源</div><div class="overview-stat">' + pendingResourceUploads + '</div></div>');
+  if (pendingAppeals > 0) overviewCards.push('<div class="monitor-mini-card"><div class="overview-label">用户申诉</div><div class="overview-stat">' + pendingAppeals + '</div></div>');
+  if (getDashboardField(data, "storageWarningLow", "storage_warning_low", false)) overviewCards.push('<div class="monitor-mini-card alert"><div class="overview-label">存储状态</div><div class="overview-stat metric-value alert" style="font-size:18px">' + App.escapeHtml(formatStorageStatus(data)) + '</div></div>');
   document.getElementById("overviewExtra").innerHTML = overviewCards.length
     ? '<div class="section-card overview-summary-card"><div class="section-head"><h5 class="mb-0">待办内容拆分</h5><span class="metric-muted">聚焦当前需要处理的事项</span></div><div class="overview-summary-grid">' + overviewCards.join('') + '</div></div>'
     : '';
 
-  renderVisitChart(data.recentVisits || []);
-  renderRoleChart((data.roleDistribution || []).filter(function(item) { return Number(item.value || 0) > 0; }));
-  renderActivities(data.activities || []);
+  renderRoleChart(getDashboardList(data, "roleDistribution", "role_distribution").filter(function(item) { return Number(item.value || 0) > 0; }));
+  renderActivities(getDashboardList(data, "activities", "activities"));
+}
+
+function getDashboardField(data, camelKey, snakeKey, fallback) {
+  if (!data) return fallback;
+  if (data[camelKey] != null) return data[camelKey];
+  if (snakeKey && data[snakeKey] != null) return data[snakeKey];
+  return fallback;
+}
+
+function getDashboardList(data, camelKey, snakeKey) {
+  var value = getDashboardField(data, camelKey, snakeKey, []);
+  return Array.isArray(value) ? value : [];
 }
 
 function formatTodoText(item) {
@@ -485,8 +504,9 @@ function formatTodoText(item) {
 }
 
 function formatStorageStatus(data) {
-  if (data && data.storageWarningLow) {
-    return "系统存储不足提醒：可用空间低于 " + (data.storageFreePercent == null ? 25 : data.storageFreePercent) + "%";
+  if (getDashboardField(data, "storageWarningLow", "storage_warning_low", false)) {
+    var freePercent = getDashboardField(data, "storageFreePercent", "storage_free_percent", 25);
+    return "系统存储不足提醒：可用空间低于 " + freePercent + "%";
   }
   return "系统存储正常";
 }
@@ -499,87 +519,75 @@ function quickAction(label, icon, handler) {
   return '<button class="quick-action-btn" type="button" onclick="' + handler + '"><i class="fa-solid ' + icon + '"></i><span>' + App.escapeHtml(label) + '</span></button>';
 }
 
-function renderVisitChart(visits) {
-  var chartEl = document.getElementById("chartVisits");
-  if (!visits.length || !hasEcharts()) {
-    if (charts.visits && charts.visits.dispose) {
-      charts.visits.dispose();
-      charts.visits = null;
+function renderAdminPriorityPanel(data) {
+  data = data || {};
+  var pending = Number(getDashboardField(data, "pendingReviewCount", "pending_review_count", 0) || 0);
+  var priorities = [
+    {
+      title: "待评分提交",
+      desc: pending > 0 ? "已有学生提交等待教师处理，建议跟进课程批改进度。" : "当前没有积压的学生提交。",
+      value: pending,
+      icon: "fa-hourglass-half",
+      color: "#ef4444",
+      tab: "courses"
+    },
+    {
+      title: "本周新增用户",
+      desc: "核对新增账号角色与状态，避免无效账号进入教学流程。",
+      value: Number(getDashboardField(data, "weeklyNewUsers", "weekly_new_users", 0) || 0),
+      icon: "fa-user-plus",
+      color: "#f59e0b",
+      tab: "users"
+    },
+    {
+      title: "本周新增课程",
+      desc: "检查新课程容量、教师归属和可见状态是否正确。",
+      value: Number(getDashboardField(data, "weeklyNewCourses", "weekly_new_courses", 0) || 0),
+      icon: "fa-layer-group",
+      color: "#8b5cf6",
+      tab: "courses"
+    },
+    {
+      title: "总选课人次",
+      desc: "用于观察平台使用规模，异常波动时可进入课程管理排查。",
+      value: Number(getDashboardField(data, "totalEnrollments", "total_enrollments", 0) || 0),
+      icon: "fa-list-check",
+      color: "#0ea5e9",
+      tab: "courses"
     }
-    chartEl.innerHTML = renderEmptyPanel('暂无活跃数据', hasEcharts() ? '产生登录活跃记录后，这里会展示近 7 天活跃用户趋势。' : '图表资源加载失败，请稍后刷新重试。', false);
-    return;
-  }
-  chartEl.innerHTML = '';
-  charts.visits = charts.visits || echarts.init(chartEl);
-  charts.visits.setOption({
-    tooltip: { trigger: "axis" },
-    grid: { left: 40, right: 16, top: 20, bottom: 24 },
-    xAxis: { type: "category", data: visits.map(function(item) { return item.date; }) },
-    yAxis: { type: "value" },
-    series: [{ type: "line", smooth: true, areaStyle: {}, data: visits.map(function(item) { return item.value; }), itemStyle: { color: "#0f766e" }, lineStyle: { width: 3, color: "#0f766e" } }]
-  });
-  charts.visits.resize();
+  ];
+  document.getElementById("adminPriorityPanel").innerHTML =
+    '<div class="admin-priority-list">' + priorities.map(function(item) {
+      return '<button class="admin-priority-item text-start" type="button" onclick="switchTab(\'' + item.tab + '\')">' +
+        '<span class="admin-priority-copy"><span class="admin-priority-icon" style="background:' + item.color + '1a;color:' + item.color + '"><i class="fa-solid ' + item.icon + '"></i></span>' +
+        '<span class="d-block"><span class="fw-semibold d-block">' + App.escapeHtml(item.title) + '</span><span class="small text-muted">' + App.escapeHtml(item.desc) + '</span></span></span>' +
+        '<span class="fw-bold fs-4">' + item.value + '</span>' +
+      '</button>';
+    }).join('') + '</div>';
 }
 
 function renderRoleChart(items) {
   var chartEl = document.getElementById("chartRoles");
   var safeItems = (items || []).filter(function(item) { return Number(item.value || 0) > 0; });
+  if (charts.roles && charts.roles.dispose) {
+    charts.roles.dispose();
+    charts.roles = null;
+  }
   if (!safeItems.length) {
-    if (charts.roles && charts.roles.dispose) {
-      charts.roles.dispose();
-      charts.roles = null;
-    }
     chartEl.innerHTML = renderEmptyPanel('暂无角色数据', '创建用户后，这里会展示学生、教师和管理员的占比。', false);
     return;
   }
-  chartEl.innerHTML = '';
-  charts.roles = charts.roles || echarts.init(chartEl);
-  charts.roles.setOption({
-    tooltip: {
-      trigger: "item",
-      formatter: "{b}<br/>{c} 人 ({d}%)"
-    },
-    legend: {
-      bottom: 6,
-      left: "center",
-      itemWidth: 10,
-      itemHeight: 10
-    },
-    color: ["#3b82f6", "#10b981", "#f59e0b"],
-    series: [{
-      name: "用户角色",
-      type: "pie",
-      radius: ["40%", "62%"],
-      center: ["44%", "42%"],
-      avoidLabelOverlap: true,
-      itemStyle: {
-        borderColor: "#fff",
-        borderWidth: 4
-      },
-      labelLine: {
-        length: 12,
-        length2: 10
-      },
-      label: {
-        show: true,
-        formatter: "{b}\n{c} 人"
-      },
-      emphasis: {
-        label: {
-          show: true,
-          fontSize: 16,
-          fontWeight: 700
-        }
-      },
-      data: safeItems.map(function(item) {
-        return {
-          name: item.name || "未命名角色",
-          value: Number(item.value || 0)
-        };
-      })
-    }]
-  });
-  charts.roles.resize();
+  var total = safeItems.reduce(function(sum, item) { return sum + Number(item.value || 0); }, 0);
+  var colors = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
+  chartEl.innerHTML = '<div class="role-summary-list">' + safeItems.map(function(item, index) {
+    var value = Number(item.value || 0);
+    var percent = total ? Math.round(value / total * 100) : 0;
+    var color = colors[index % colors.length];
+    return '<div class="role-summary-item">' +
+      '<div class="role-summary-head"><div class="role-summary-meta"><span class="role-dot" style="background:' + color + '"></span><span class="fw-semibold">' + App.escapeHtml(item.name || "未命名角色") + '</span></div><div class="text-end"><div class="fw-bold">' + value + ' 人</div><div class="small text-muted">' + percent + '%</div></div></div>' +
+      '<div class="role-progress"><span style="width:' + percent + '%;background:' + color + '"></span></div>' +
+    '</div>';
+  }).join('') + '</div>';
 }
 
 function renderUserPager(total, page) {

@@ -153,11 +153,15 @@ async def grades(
 @router.get("/courses/{course_id}/average")
 async def course_average(
     course_id: int,
+    user: User = Depends(require_student),
     db: AsyncSession = Depends(get_db),
 ):
     """课程平均分"""
     service = StudentService(db)
-    avg = await service.get_course_average(course_id)
+    try:
+        avg = await service.get_course_average(course_id, user)
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
     if avg < 0:
         return ApiResponse.error(message="暂无成绩数据")
     return ApiResponse.ok(data={"course_id": course_id, "average": avg})

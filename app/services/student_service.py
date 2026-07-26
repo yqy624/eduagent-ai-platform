@@ -1,7 +1,7 @@
 """学生服务"""
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import (
@@ -36,10 +36,25 @@ class StudentService:
         courses = await self.course_service.get_student_courses(student.id)
         course_ids = [c.id for c in courses]
 
-        # 已提交待批改
-        pending = (await self.db.execute(
+        # 已选课程中尚未提交且未截止的作业
+        pending = 0
+        if course_ids:
+            pending = (await self.db.execute(
+                select(func.count(Assignment.id)).where(
+                    Assignment.course_id.in_(course_ids),
+                    or_(Assignment.due_date.is_(None), Assignment.due_date >= datetime.now()),
+                    Assignment.id.not_in(
+                        select(Submission.assignment_id).where(
+                            Submission.student_id == student.id
+                        )
+                    ),
+                )
+            )).scalar() or 0
+
+        submitted_pending = (await self.db.execute(
             select(func.count(Submission.id)).where(
-                Submission.student_id == student.id, Submission.status == "SUBMITTED"
+                Submission.student_id == student.id,
+                Submission.status == "SUBMITTED",
             )
         )).scalar() or 0
 
@@ -70,12 +85,18 @@ class StudentService:
             .limit(6)
         )
         recent_grades = []
+        score_trend = []
         for sub, ass, course in recent_raw:
             recent_grades.append({
                 "courseName": course.name,
                 "assignmentTitle": ass.title,
                 "score": sub.score,
             })
+            score_trend.append({
+                "name": ass.title,
+                "value": sub.score,
+            })
+        score_trend.reverse()
 
         # 近期活动
         from app.models.models import PublishedActivity
@@ -96,8 +117,9 @@ class StudentService:
             "graded_count": graded,
             "peer_review_bonus": float(bonus),
             "pending_count": pending,
+            "submitted_pending_count": submitted_pending,
             "recent_grades": recent_grades,
-            "score_trend": [],
+            "score_trend": score_trend,
             "recent_activities": activities,
         }
 
@@ -191,8 +213,16 @@ class StudentService:
                 "teacherId": a.teacher_id,
                 "createdAt": a.created_at.isoformat() if a.created_at else None,
                 "peerReviewEnabled": a.peer_review_enabled,
+                "status": self.assignment_service.assignment_status(a),
                 "submissionStatus": sub_obj.status if sub_obj else "NOT_SUBMITTED",
                 "submissionId": sub_obj.id if sub_obj else None,
+                "content": sub_obj.content if sub_obj else None,
+                "filePaths": sub_obj.file_paths if sub_obj else None,
+                "fileName": sub_obj.file_name if sub_obj else None,
+                "score": sub_obj.score if sub_obj else None,
+                "teacherComment": sub_obj.teacher_comment if sub_obj else None,
+                "submittedAt": sub_obj.submitted_at.isoformat() if sub_obj and sub_obj.submitted_at else None,
+                "gradedAt": sub_obj.graded_at.isoformat() if sub_obj and sub_obj.graded_at else None,
             })
         return result
 
@@ -255,6 +285,8 @@ class StudentService:
                             "submissionId": t_sub_obj.id,
                             "studentName": t_stu_obj.display_name or t_stu_obj.username if t_stu_obj else "同学",
                             "content": t_sub_obj.content or "",
+                            "filePaths": t_sub_obj.file_paths,
+                            "submittedAt": t_sub_obj.submitted_at.isoformat() if t_sub_obj.submitted_at else None,
                         }
 
                 reviews_data.append({
@@ -300,60 +332,124 @@ class StudentService:
             raise ValueError("未分配此互评任务")
         if review.status != "ASSIGNED":
             raise ValueError("此互评任务已完成或已过期")
+        if not comment or len(comment.strip()) < 10:
+            raise ValueError("互评内容不能少于 10 个字")
+
+        assignment = await self.assignment_service.get_by_id(assignment_id)
+        if assignment is None:
+            raise ValueError("作业不存在")
+        if not assignment.peer_review_enabled:
+            raise ValueError("此作业未开启互评")
+        now = datetime.now()
+        if assignment.peer_review_open_at and now < assignment.peer_review_open_at:
+            raise ValueError("互评尚未开放")
+        if assignment.peer_review_close_at and now > assignment.peer_review_close_at:
+            raise ValueError("互评已截止")
+
+        target = await self.db.execute(
+            select(Submission).where(
+                Submission.id == target_submission_id,
+                Submission.assignment_id == assignment_id,
+            )
+        )
+        target_submission = target.scalar_one_or_none()
+        if target_submission is None:
+            raise ValueError("被评提交不存在")
+        if target_submission.student_id == student.id:
+            raise ValueError("不能评价自己的作业")
 
         review.rating = rating
-        review.comment = comment
-        review.status = "SUBMITTED"
+        review.comment = comment.strip()
         review.submitted_at = datetime.now()
+        granted = await self._grant_peer_review_bonus(review, assignment)
+        review.status = "BONUS_GRANTED" if granted > 0 else "SUBMITTED"
         await self.db.flush()
         return await self._to_peer_review_response(review)
 
-    async def get_my_grades(self, student: User) -> List[StudentGradeResponse]:
-        enrollments = await self.db.execute(
-            select(Enrollment).where(Enrollment.student_id == student.id)
+    async def _grant_peer_review_bonus(
+        self, review: PeerReview, assignment: Assignment
+    ) -> float:
+        per_review = float(assignment.peer_review_bonus_per_review or 0)
+        cap = float(assignment.peer_review_bonus_cap or 0)
+        if per_review <= 0 or cap <= 0:
+            return 0
+
+        granted_count = (
+            await self.db.execute(
+                select(func.count(PeerReview.id)).where(
+                    PeerReview.assignment_id == assignment.id,
+                    PeerReview.reviewer_id == review.reviewer_id,
+                    PeerReview.status == "BONUS_GRANTED",
+                )
+            )
+        ).scalar() or 0
+        already_granted = float(granted_count) * per_review
+        grant = max(0.0, min(per_review, cap - already_granted))
+        if grant <= 0:
+            return 0
+
+        enrollment_result = await self.db.execute(
+            select(Enrollment).where(
+                Enrollment.course_id == assignment.course_id,
+                Enrollment.student_id == review.reviewer_id,
+            )
         )
-        enrollments = list(enrollments.scalars().all())
+        enrollment = enrollment_result.scalar_one_or_none()
+        if enrollment is None:
+            return 0
+
+        enrollment.peer_review_bonus = float(enrollment.peer_review_bonus or 0) + grant
+        enrollment.score = float(enrollment.base_score or 0) + float(enrollment.peer_review_bonus or 0)
+        return grant
+
+    async def get_my_grades(self, student: User) -> List[Dict[str, Any]]:
+        rows = await self.db.execute(
+            select(Submission, Assignment, Course, Enrollment)
+            .join(Assignment, Submission.assignment_id == Assignment.id)
+            .join(Course, Assignment.course_id == Course.id)
+            .join(
+                Enrollment,
+                (Enrollment.course_id == Course.id)
+                & (Enrollment.student_id == Submission.student_id),
+            )
+            .where(Submission.student_id == student.id)
+            .order_by(Submission.submitted_at.desc(), Submission.id.desc())
+        )
 
         result = []
-        for enr in enrollments:
-            course = await self.course_service.get_by_id(enr.course_id)
-            submissions = await self.db.execute(
-                select(Submission).where(
-                    Submission.student_id == student.id,
-                    Submission.assignment_id.in_(
-                        select(Assignment.id).where(
-                            Assignment.course_id == enr.course_id
-                        )
-                    ),
-                )
-            )
-            subs = list(submissions.scalars().all())
-            assignments_data = []
-            for sub in subs:
-                ass = await self.assignment_service.get_by_id(sub.assignment_id)
-                assignments_data.append({
-                    "assignment_id": sub.assignment_id,
-                    "assignment_title": ass.title if ass else None,
-                    "score": sub.score,
-                    "status": sub.status,
-                    "comment": sub.teacher_comment,
-                    "submitted_at": sub.submitted_at.isoformat()
-                    if sub.submitted_at
-                    else None,
-                })
-
-            result.append(
-                StudentGradeResponse(
-                    course_id=enr.course_id,
-                    course_name=course.name if course else None,
-                    assignments=assignments_data,
-                    course_average=enr.base_score if enr.base_score else 0,
-                    peer_review_bonus=enr.peer_review_bonus or 0,
-                )
-            )
+        for sub, assignment, course, enrollment in rows:
+            teacher_score = sub.score if sub.status == "GRADED" else None
+            peer_bonus = float(enrollment.peer_review_bonus or 0)
+            result.append({
+                "id": sub.id,
+                "submissionId": sub.id,
+                "assignmentId": assignment.id,
+                "assignmentTitle": assignment.title,
+                "courseId": course.id,
+                "courseName": course.name,
+                "content": sub.content,
+                "filePaths": sub.file_paths,
+                "fileName": sub.file_name,
+                "status": sub.status,
+                "teacherScore": teacher_score,
+                "peerReviewBonus": peer_bonus,
+                "score": (float(teacher_score) + peer_bonus) if teacher_score is not None else None,
+                "teacherComment": sub.teacher_comment,
+                "submittedAt": sub.submitted_at.isoformat() if sub.submitted_at else None,
+                "gradedAt": sub.graded_at.isoformat() if sub.graded_at else None,
+            })
         return result
 
-    async def get_course_average(self, course_id: int) -> float:
+    async def get_course_average(self, course_id: int, student: User) -> float:
+        enrollment = await self.db.execute(
+            select(Enrollment).where(
+                Enrollment.course_id == course_id,
+                Enrollment.student_id == student.id,
+            )
+        )
+        if enrollment.scalar_one_or_none() is None and student.role != "ADMIN":
+            raise ValueError("未选修此课程")
+
         result = await self.db.execute(
             select(func.avg(Submission.score)).where(
                 Submission.status == "GRADED",

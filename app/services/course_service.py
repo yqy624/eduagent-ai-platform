@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import Course, User, Enrollment
+from app.models.models import Assignment, Course, User, Enrollment
 from app.schemas.assignment import CourseCreate, CourseUpdate, CourseResponse
 
 
@@ -45,21 +45,42 @@ class CourseService:
             raise ValueError("无权修改此课程")
 
         update_data = req.model_dump(exclude_none=True)
+        if "max_students" in update_data and update_data["max_students"] < course.enrolled_count:
+            raise ValueError("课程容量不能小于当前选课人数")
         for key, value in update_data.items():
             setattr(course, key, value)
         await self.db.flush()
         return course
 
-    async def delete(self, course_id: int):
+    async def delete(self, course_id: int, teacher: User):
         course = await self.get_by_id(course_id)
         if course is None:
             raise ValueError("课程不存在")
-        await self.db.delete(course)
+        if course.teacher_id != teacher.id and teacher.role != "ADMIN":
+            raise ValueError("无权删除此课程")
+
+        enrollment_count = (
+            await self.db.execute(
+                select(func.count(Enrollment.id)).where(Enrollment.course_id == course_id)
+            )
+        ).scalar() or 0
+        assignment_count = (
+            await self.db.execute(
+                select(func.count(Assignment.id)).where(Assignment.course_id == course_id)
+            )
+        ).scalar() or 0
+        if enrollment_count or assignment_count:
+            course.visible = False
+        else:
+            await self.db.delete(course)
         await self.db.flush()
 
     async def get_teacher_courses(self, teacher_id: int) -> List[Course]:
         result = await self.db.execute(
-            select(Course).where(Course.teacher_id == teacher_id)
+            select(Course).where(
+                Course.teacher_id == teacher_id,
+                Course.visible == True,
+            )
         )
         return list(result.scalars().all())
 

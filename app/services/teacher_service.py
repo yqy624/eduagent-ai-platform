@@ -8,6 +8,7 @@ from app.models.models import (
     Assignment, Course, Enrollment, PeerReview, PublishedActivity, Submission, User,
 )
 from app.schemas.assignment import (
+    AssignmentUpdate,
     CourseCreate,
     CourseUpdate,
     GradeRequest,
@@ -100,10 +101,15 @@ class TeacherService:
         resp = await self.course_service.to_response(course)
         return resp.model_dump()
 
-    async def delete_course(self, course_id: int):
-        await self.course_service.delete(course_id)
+    async def delete_course(self, course_id: int, teacher: User):
+        await self.course_service.delete(course_id, teacher)
 
-    async def get_course_students(self, course_id: int) -> List[Dict]:
+    async def get_course_students(self, course_id: int, teacher: User) -> List[Dict]:
+        course = await self.course_service.get_by_id(course_id)
+        if course is None:
+            raise ValueError("课程不存在")
+        if course.teacher_id != teacher.id and teacher.role != "ADMIN":
+            raise ValueError("无权查看此课程学生")
         result = await self.db.execute(
             select(User).join(Enrollment, Enrollment.student_id == User.id)
             .where(Enrollment.course_id == course_id)
@@ -118,23 +124,59 @@ class TeacherService:
         assignment = await self.assignment_service.create(req if isinstance(req, AssignmentCreate) else AssignmentCreate(**req), teacher)
         return await self._to_assignment_dict(assignment)
 
-    async def get_course_assignments(self, course_id: int) -> List[Dict]:
+    async def update_assignment(
+        self, assignment_id: int, req: AssignmentUpdate, teacher: User
+    ) -> Dict:
+        assignment = await self.assignment_service.update(assignment_id, req, teacher)
+        return await self._to_assignment_dict(assignment)
+
+    async def delete_assignment(self, assignment_id: int, teacher: User):
+        await self.assignment_service.delete(assignment_id, teacher)
+
+    async def get_course_assignments(self, course_id: int, teacher: User) -> List[Dict]:
+        course = await self.course_service.get_by_id(course_id)
+        if course is None:
+            raise ValueError("课程不存在")
+        if course.teacher_id != teacher.id and teacher.role != "ADMIN":
+            raise ValueError("无权查看此课程作业")
         assignments = await self.assignment_service.get_course_assignments(course_id)
         return [await self._to_assignment_dict(a) for a in assignments]
 
-    async def get_submissions(self, assignment_id: int) -> List[Dict]:
+    async def get_submissions(self, assignment_id: int, teacher: User) -> List[Dict]:
+        await self.assignment_service.ensure_teacher_can_access(assignment_id, teacher)
         submissions = await self.assignment_service.get_submissions(assignment_id)
-        return [await self.assignment_service.to_submission_response(s) for s in submissions]
+        responses = []
+        for s in submissions:
+            resp = await self.assignment_service.to_submission_response(s)
+            data = resp.model_dump()
+            data["studentName"] = resp.student_name
+            responses.append(data)
+        return responses
 
     async def grade_submission(self, submission_id: int, req: GradeRequest, teacher: User) -> Dict:
         submission = await self.assignment_service.grade(submission_id, req, teacher)
         resp = await self.assignment_service.to_submission_response(submission)
         return resp.model_dump()
 
-    async def get_assignment_analysis(self, assignment_id: int) -> Dict:
-        return (await self.assignment_service.get_assignment_analysis(assignment_id)).model_dump()
+    async def get_assignment_analysis(self, assignment_id: int, teacher: User) -> Dict:
+        await self.assignment_service.ensure_teacher_can_access(assignment_id, teacher)
+        analysis = await self.assignment_service.get_assignment_analysis(assignment_id)
+        data = analysis.model_dump()
+        distribution = analysis.score_distribution or {}
+        data.update({
+            "total": analysis.total_submissions,
+            "graded": analysis.graded_count,
+            "average": analysis.average_score,
+            "max": analysis.max_score,
+            "min": analysis.min_score,
+            "passRate": analysis.pass_rate,
+            "buckets": list(distribution.keys()),
+            "distribution": list(distribution.values()),
+        })
+        return data
 
-    async def get_peer_review_overview(self, assignment_id: int) -> Dict:
+    async def get_peer_review_overview(self, assignment_id: int, teacher: User) -> Dict:
+        await self.assignment_service.ensure_teacher_can_access(assignment_id, teacher)
         return await self.assignment_service.get_peer_review_overview(assignment_id)
 
     async def update_peer_review(
@@ -148,6 +190,13 @@ class TeacherService:
         )
 
     async def _to_assignment_dict(self, assignment):
+        submission_count = (
+            await self.db.execute(
+                select(func.count(Submission.id)).where(
+                    Submission.assignment_id == assignment.id
+                )
+            )
+        ).scalar() or 0
         return {
             "id": assignment.id, "title": assignment.title,
             "description": assignment.description,
@@ -157,4 +206,6 @@ class TeacherService:
             "teacherId": assignment.teacher_id,
             "createdAt": assignment.created_at.isoformat() if assignment.created_at else None,
             "peerReviewEnabled": assignment.peer_review_enabled,
+            "submissionCount": submission_count,
+            "status": self.assignment_service.assignment_status(assignment),
         }

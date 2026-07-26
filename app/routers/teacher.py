@@ -7,6 +7,7 @@ from app.middleware.auth import require_teacher
 from app.models.models import User
 from app.schemas.assignment import (
     AssignmentCreate,
+    AssignmentUpdate,
     CourseCreate,
     CourseUpdate,
     GradeRequest,
@@ -75,23 +76,31 @@ async def update_course(
 @router.delete("/courses/{course_id}")
 async def delete_course(
     course_id: int,
+    user: User = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),
 ):
     """删除课程"""
     service = TeacherService(db)
-    await service.delete_course(course_id)
-    return ApiResponse.ok(message="课程已删除")
+    try:
+        await service.delete_course(course_id, user)
+        return ApiResponse.ok(message="课程已删除")
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
 
 
 @router.get("/courses/{course_id}/students")
 async def course_students(
     course_id: int,
+    user: User = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),
 ):
     """查看课程学生名单"""
     service = TeacherService(db)
-    data = await service.get_course_students(course_id)
-    return ApiResponse.ok(data=data)
+    try:
+        data = await service.get_course_students(course_id, user)
+        return ApiResponse.ok(data=data)
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
 
 
 @router.post("/assignments")
@@ -112,23 +121,62 @@ async def create_assignment(
 @router.get("/courses/{course_id}/assignments")
 async def course_assignments(
     course_id: int,
+    user: User = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),
 ):
     """课程作业列表"""
     service = TeacherService(db)
-    data = await service.get_course_assignments(course_id)
-    return ApiResponse.ok(data=data)
+    try:
+        data = await service.get_course_assignments(course_id, user)
+        return ApiResponse.ok(data=data)
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
+
+
+@router.put("/assignments/{assignment_id}")
+async def update_assignment(
+    assignment_id: int,
+    req: AssignmentUpdate,
+    user: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """编辑作业"""
+    service = TeacherService(db)
+    try:
+        data = await service.update_assignment(assignment_id, req, user)
+        return ApiResponse.ok(data=data, message="作业已更新")
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
+
+
+@router.delete("/assignments/{assignment_id}")
+async def delete_assignment(
+    assignment_id: int,
+    user: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除作业"""
+    service = TeacherService(db)
+    try:
+        await service.delete_assignment(assignment_id, user)
+        return ApiResponse.ok(message="作业已删除")
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
 
 
 @router.get("/assignments/{assignment_id}/submissions")
 async def pending_submissions(
     assignment_id: int,
+    user: User = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),
 ):
     """查看作业提交记录"""
     service = TeacherService(db)
-    data = await service.get_submissions(assignment_id)
-    return ApiResponse.ok(data=data)
+    try:
+        data = await service.get_submissions(assignment_id, user)
+        return ApiResponse.ok(data=data)
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
 
 
 @router.post("/submissions/{submission_id}/grade")
@@ -150,12 +198,13 @@ async def grade_submission(
 @router.get("/assignments/{assignment_id}/analysis")
 async def assignment_analysis(
     assignment_id: int,
+    user: User = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),
 ):
     """作业成绩分析"""
     service = TeacherService(db)
     try:
-        data = await service.get_assignment_analysis(assignment_id)
+        data = await service.get_assignment_analysis(assignment_id, user)
         return ApiResponse.ok(data=data)
     except ValueError as e:
         return ApiResponse.error(message=str(e), code=400)
@@ -164,12 +213,16 @@ async def assignment_analysis(
 @router.get("/assignments/{assignment_id}/peer-review")
 async def peer_review_overview(
     assignment_id: int,
+    user: User = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),
 ):
     """互评概览"""
     service = TeacherService(db)
-    data = await service.get_peer_review_overview(assignment_id)
-    return ApiResponse.ok(data=data)
+    try:
+        data = await service.get_peer_review_overview(assignment_id, user)
+        return ApiResponse.ok(data=data)
+    except ValueError as e:
+        return ApiResponse.error(message=str(e), code=400)
 
 
 async def _update_peer_review(

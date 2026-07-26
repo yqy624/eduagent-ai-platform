@@ -67,6 +67,14 @@ class AssignmentCreate(BaseModel):
     peer_review_prompt: Optional[str] = None
 
 
+class AssignmentUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    total_points: Optional[int] = Field(None, ge=0)
+    attachment_paths: Optional[str] = None
+
+
 class PeerReviewConfigUpdate(BaseModel):
     peer_review_enabled: bool = False
     peer_review_open_at: Optional[str] = None
@@ -88,6 +96,8 @@ class AssignmentResponse(BaseModel):
     teacher_id: int
     created_at: Optional[str] = None
     peer_review_enabled: bool
+    status: str = "PUBLISHED"
+    submission_count: int = 0
 
 
 # ===== 作业提交 =====

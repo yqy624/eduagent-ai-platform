@@ -14,6 +14,7 @@ from app.models.models import (
 )
 from app.schemas.assignment import (
     AssignmentCreate,
+    AssignmentUpdate,
     AssignmentResponse,
     GradeRequest,
     PeerReviewConfigUpdate,
@@ -34,6 +35,36 @@ class AssignmentService:
         )
         return result.scalar_one_or_none()
 
+    @staticmethod
+    def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=None)
+
+    @staticmethod
+    def assignment_status(assignment: Assignment) -> str:
+        if assignment.due_date and assignment.due_date < datetime.now():
+            return "CLOSED"
+        return "PUBLISHED"
+
+    async def ensure_teacher_can_access(
+        self, assignment_id: int, teacher: User
+    ) -> Assignment:
+        assignment = await self.get_by_id(assignment_id)
+        if assignment is None:
+            raise ValueError("作业不存在")
+
+        course_result = await self.db.execute(
+            select(Course).where(Course.id == assignment.course_id)
+        )
+        course = course_result.scalar_one_or_none()
+        if course is None:
+            raise ValueError("课程不存在")
+        if course.teacher_id != teacher.id and teacher.role != "ADMIN":
+            raise ValueError("无权访问此作业")
+        return assignment
+
     async def create(self, req: AssignmentCreate, teacher: User) -> Assignment:
         course = await self.db.execute(
             select(Course).where(Course.id == req.course_id)
@@ -44,23 +75,25 @@ class AssignmentService:
         if course_obj.teacher_id != teacher.id and teacher.role != "ADMIN":
             raise ValueError("无权为此课程发布作业")
 
-        due_date = None
-        if req.due_date:
-            try:
-                due_date = datetime.fromisoformat(req.due_date.replace("Z", "+00:00"))
-            except ValueError:
-                due_date = datetime.strptime(req.due_date, "%Y-%m-%dT%H:%M:%S")
+        duplicate = await self.db.execute(
+            select(Assignment).where(
+                Assignment.course_id == req.course_id,
+                Assignment.title == req.title,
+            )
+        )
+        if duplicate.scalar_one_or_none() is not None:
+            raise ValueError("同一课程下已存在同名作业，请勿重复发布")
 
-        peer_review_open = None
-        peer_review_close = None
-        if req.peer_review_open_at:
-            peer_review_open = datetime.fromisoformat(
-                req.peer_review_open_at.replace("Z", "+00:00")
-            )
-        if req.peer_review_close_at:
-            peer_review_close = datetime.fromisoformat(
-                req.peer_review_close_at.replace("Z", "+00:00")
-            )
+        due_date = self._parse_datetime(req.due_date)
+        if due_date and due_date < datetime.now():
+            raise ValueError("截止时间不能早于当前时间")
+
+        peer_review_open = self._parse_datetime(req.peer_review_open_at)
+        peer_review_close = self._parse_datetime(req.peer_review_close_at)
+        if peer_review_open and peer_review_close and peer_review_close <= peer_review_open:
+            raise ValueError("互评截止时间必须晚于开放时间")
+        if req.peer_review_required_count is not None and req.peer_review_required_count < 1:
+            raise ValueError("每人互评次数至少为 1")
 
         assignment = Assignment(
             course_id=req.course_id,
@@ -81,7 +114,54 @@ class AssignmentService:
         )
         self.db.add(assignment)
         await self.db.flush()
+        if assignment.peer_review_enabled:
+            await self._generate_peer_reviews(assignment)
         return assignment
+
+    async def update(
+        self, assignment_id: int, req: AssignmentUpdate, teacher: User
+    ) -> Assignment:
+        assignment = await self.ensure_teacher_can_access(assignment_id, teacher)
+        update_data = req.model_dump(exclude_unset=True)
+
+        if "title" in update_data and update_data["title"]:
+            duplicate = await self.db.execute(
+                select(Assignment).where(
+                    Assignment.course_id == assignment.course_id,
+                    Assignment.title == update_data["title"],
+                    Assignment.id != assignment_id,
+                )
+            )
+            if duplicate.scalar_one_or_none() is not None:
+                raise ValueError("同一课程下已存在同名作业")
+
+        if "due_date" in update_data:
+            assignment.due_date = self._parse_datetime(update_data.pop("due_date"))
+            if assignment.due_date and assignment.due_date < datetime.now():
+                raise ValueError("截止时间不能早于当前时间")
+
+        for key, value in update_data.items():
+            setattr(assignment, key, value)
+        await self.db.flush()
+        return assignment
+
+    async def delete(self, assignment_id: int, teacher: User):
+        assignment = await self.ensure_teacher_can_access(assignment_id, teacher)
+        submission_count = (
+            await self.db.execute(
+                select(func.count(Submission.id)).where(
+                    Submission.assignment_id == assignment_id
+                )
+            )
+        ).scalar() or 0
+        if submission_count:
+            raise ValueError("已有学生提交，不能删除该作业")
+
+        await self.db.execute(
+            PeerReview.__table__.delete().where(PeerReview.assignment_id == assignment_id)
+        )
+        await self.db.delete(assignment)
+        await self.db.flush()
 
     async def get_course_assignments(self, course_id: int) -> List[Assignment]:
         result = await self.db.execute(
@@ -114,6 +194,8 @@ class AssignmentService:
         assignment = await self.get_by_id(assignment_id)
         if assignment is None:
             raise ValueError("作业不存在")
+        if assignment.due_date and assignment.due_date < datetime.now():
+            raise ValueError("作业已截止，不能提交")
 
         # 检查是否已选课
         enrollment = await self.db.execute(
@@ -125,19 +207,35 @@ class AssignmentService:
         if enrollment.scalar_one_or_none() is None and student.role != "ADMIN":
             raise ValueError("未选修此课程，无法提交作业")
 
-        # 检查是否已提交
         existing = await self.db.execute(
             select(Submission).where(
                 Submission.assignment_id == assignment_id,
                 Submission.student_id == student.id,
             )
         )
-        if existing.scalar_one_or_none() is not None:
-            raise ValueError("已提交过此作业，请勿重复提交")
+        existing_submission = existing.scalar_one_or_none()
+
+        if not content and not file_path and not (
+            existing_submission and existing_submission.file_paths
+        ):
+            raise ValueError("提交内容或附件至少填写一项")
 
         stored = None
         if file_path:
             stored = file_path + ("::" + file_name if file_name else "")
+
+        if existing_submission is not None:
+            if existing_submission.status == "GRADED":
+                raise ValueError("作业已评分，不能重复提交")
+            existing_submission.content = content
+            existing_submission.file_name = file_name or existing_submission.file_name
+            existing_submission.file_paths = stored or existing_submission.file_paths
+            existing_submission.status = "SUBMITTED"
+            existing_submission.submitted_at = datetime.now()
+            await self.db.flush()
+            if assignment.peer_review_enabled:
+                await self._generate_peer_reviews(assignment)
+            return existing_submission
 
         submission = Submission(
             assignment_id=assignment_id,
@@ -150,6 +248,8 @@ class AssignmentService:
         )
         self.db.add(submission)
         await self.db.flush()
+        if assignment.peer_review_enabled:
+            await self._generate_peer_reviews(assignment)
         return submission
 
     async def grade(
@@ -162,6 +262,8 @@ class AssignmentService:
         assignment = await self.get_by_id(submission.assignment_id)
         if assignment is None:
             raise ValueError("作业不存在")
+        if req.score > (assignment.total_points or 100):
+            raise ValueError("评分不能超过作业满分")
 
         course = await self.db.execute(
             select(Course).where(Course.id == assignment.course_id)
@@ -204,6 +306,7 @@ class AssignmentService:
         enrollment = pr_result.scalar_one_or_none()
         if enrollment:
             enrollment.base_score = float(total)
+            enrollment.score = float(total) + float(enrollment.peer_review_bonus or 0)
             await self.db.flush()
 
     async def get_assignment_analysis(
@@ -237,7 +340,37 @@ class AssignmentService:
             max_score=max_score,
             min_score=min_score,
             pass_rate=pass_rate,
+            score_distribution=self._score_distribution(
+                [float(s.score) for s in graded if s.score is not None],
+                assignment.total_points or 100,
+            ),
         )
+
+    @staticmethod
+    def _score_distribution(scores: List[float], total_points: int) -> Dict[str, int]:
+        if not scores:
+            return {}
+        buckets = {
+            "0-59%": 0,
+            "60-69%": 0,
+            "70-79%": 0,
+            "80-89%": 0,
+            "90-100%": 0,
+        }
+        total = total_points or 100
+        for score in scores:
+            pct = score / total * 100 if total else 0
+            if pct < 60:
+                buckets["0-59%"] += 1
+            elif pct < 70:
+                buckets["60-69%"] += 1
+            elif pct < 80:
+                buckets["70-79%"] += 1
+            elif pct < 90:
+                buckets["80-89%"] += 1
+            else:
+                buckets["90-100%"] += 1
+        return buckets
 
     async def get_peer_review_overview(self, assignment_id: int) -> Dict[str, Any]:
         """获取互评概览（前端兼容字段）"""
@@ -253,7 +386,7 @@ class AssignmentService:
         submitted = await self.db.execute(
             select(func.count(PeerReview.id)).where(
                 PeerReview.assignment_id == assignment_id,
-                PeerReview.status == "SUBMITTED",
+                PeerReview.status.in_(["SUBMITTED", "BONUS_GRANTED"]),
             )
         )
         submitted_count = submitted.scalar() or 0
@@ -273,6 +406,7 @@ class AssignmentService:
             "requiredCount": assignment.peer_review_required_count or 1,
             "bonusPerReview": assignment.peer_review_bonus_per_review or 1.0,
             "bonusCap": assignment.peer_review_bonus_cap or 3.0,
+            "prompt": assignment.peer_review_prompt,
             "totalReviews": submitted_count,
             "grantedCount": granted_count,
             "totalAssignments": total,
@@ -299,20 +433,76 @@ class AssignmentService:
         if course.teacher_id != teacher.id and teacher.role != "ADMIN":
             raise ValueError("无权配置此作业的互评")
 
-        def parse_datetime(value: Optional[str]) -> Optional[datetime]:
-            if not value:
-                return None
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
         assignment.peer_review_enabled = req.peer_review_enabled
-        assignment.peer_review_open_at = parse_datetime(req.peer_review_open_at)
-        assignment.peer_review_close_at = parse_datetime(req.peer_review_close_at)
-        assignment.peer_review_required_count = req.peer_review_required_count
+        assignment.peer_review_open_at = self._parse_datetime(req.peer_review_open_at)
+        assignment.peer_review_close_at = self._parse_datetime(req.peer_review_close_at)
+        if (
+            assignment.peer_review_open_at
+            and assignment.peer_review_close_at
+            and assignment.peer_review_close_at <= assignment.peer_review_open_at
+        ):
+            raise ValueError("互评截止时间必须晚于开放时间")
+        assignment.peer_review_required_count = req.peer_review_required_count or 1
         assignment.peer_review_bonus_per_review = req.peer_review_bonus_per_review
         assignment.peer_review_bonus_cap = req.peer_review_bonus_cap
         assignment.peer_review_prompt = req.peer_review_prompt
         await self.db.flush()
+        if assignment.peer_review_enabled:
+            await self._generate_peer_reviews(assignment)
         return await self.get_peer_review_overview(assignment_id)
+
+    async def _generate_peer_reviews(self, assignment: Assignment):
+        required = max(1, assignment.peer_review_required_count or 1)
+        result = await self.db.execute(
+            select(Submission)
+            .where(
+                Submission.assignment_id == assignment.id,
+                Submission.status.in_(["SUBMITTED", "GRADED"]),
+            )
+            .order_by(Submission.submitted_at.asc(), Submission.id.asc())
+        )
+        submissions = list(result.scalars().all())
+        if len(submissions) < 2:
+            return
+
+        existing_result = await self.db.execute(
+            select(PeerReview).where(PeerReview.assignment_id == assignment.id)
+        )
+        existing_reviews = list(existing_result.scalars().all())
+        existing_pairs = {
+            (review.reviewer_id, review.target_submission_id)
+            for review in existing_reviews
+        }
+        existing_counts: Dict[int, int] = {}
+        for review in existing_reviews:
+            existing_counts[review.reviewer_id] = (
+                existing_counts.get(review.reviewer_id, 0) + 1
+            )
+
+        max_targets = min(required, len(submissions) - 1)
+        for index, reviewer_submission in enumerate(submissions):
+            created = existing_counts.get(reviewer_submission.student_id, 0)
+            offset = 1
+            while created < max_targets and offset < len(submissions):
+                target = submissions[(index + offset) % len(submissions)]
+                offset += 1
+                if target.student_id == reviewer_submission.student_id:
+                    continue
+                pair = (reviewer_submission.student_id, target.id)
+                if pair in existing_pairs:
+                    continue
+                self.db.add(
+                    PeerReview(
+                        assignment_id=assignment.id,
+                        reviewer_id=reviewer_submission.student_id,
+                        target_submission_id=target.id,
+                        status="ASSIGNED",
+                        assigned_at=datetime.now(),
+                    )
+                )
+                existing_pairs.add(pair)
+                created += 1
+        await self.db.flush()
 
     async def to_submission_response(
         self, submission: Submission
