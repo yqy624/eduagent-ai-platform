@@ -286,7 +286,7 @@ def _json_context(data: Dict[str, Any], max_chars: int = 9000) -> str:
 
 
 AGENT_MODE_CONFIG = {
-    "course_material": {"label": "课程资料", "needs_rag": True, "needs_business": False},
+    "course_material": {"label": "课程资料", "needs_rag": True, "needs_business": True},
     "assignment_submission": {"label": "作业提交", "needs_rag": False, "needs_business": True},
     "teaching_advice": {"label": "教学建议", "needs_rag": True, "needs_business": True},
     "other": {"label": "其他问题", "needs_rag": False, "needs_business": False},
@@ -615,6 +615,20 @@ def _fallback_agent_answer(
     if mode == "course_material":
         return "请先选择一门课程，或先为该课程建立 RAG 索引后再提问课程资料。"
     return "我是校园学习助手，可以回答学习方法、课程安排建议、作业推进思路等问题；我不能实时联网查询外部信息。"
+
+
+def _build_course_material_status(mode: str, citations: List[Dict[str, Any]], business_context: Optional[Dict[str, Any]]) -> str:
+    if mode != "course_material":
+        return "非课程资料模式。"
+    if citations:
+        return "本次已命中已索引课程资料，请优先依据课程资料回答。"
+    courses = (business_context or {}).get("courses") or []
+    if courses:
+        return (
+            "本次没有命中已索引课程资料。可以依据业务数据中的课程名称、简介、安排、学分等基础信息回答课程概览类问题；"
+            "如果问题需要课件、讲义或上传文档中的细节，必须说明当前未命中资料，并建议教师索引课程资料或换一个更贴近资料的问题。"
+        )
+    return "本次没有命中已索引课程资料，也没有可用课程基础信息。"
 
 
 @router.post("/courses/{course_id}/documents/index")
@@ -972,11 +986,12 @@ async def agent_chat(
                 memory_count=len(memory),
             ))
 
-        if mode == "course_material" and not citations:
+        if mode == "course_material" and not citations and not ((business_context or {}).get("courses") or []):
             answer = "当前课程资料无法支持该问题。你可以先让教师索引课程资料，或换一个更贴近已上传资料的问题。"
         else:
             rag_context = _build_rag_context(citations) if citations else "无"
             api_context = _json_context(business_context or {}) if business_context else "无"
+            course_material_status = _build_course_material_status(mode, citations, business_context)
             try:
                 llm = get_llm(temperature=0.25)
                 memory_context = _build_agent_memory_context(memory)
@@ -990,12 +1005,16 @@ async def agent_chat(
 4. 教学建议可以结合课程资料、教学数据和历史对话，但不能编造系统中没有的数据。
 5. 其他问题可以直接回答；不要假装实时联网，也不要声称查到了互联网最新信息。
 6. 历史对话只用于理解用户偏好、学习目标和上下文；若与当前业务数据冲突，以当前业务数据为准。
+7. 课程资料状态会说明本次是否命中索引资料；没有命中资料时，不要编造上传文档内容。
 
 当前问题：
 {question}
 
 历史对话记忆：
 {memory_context}
+
+课程资料状态：
+{course_material_status}
 
 业务数据：
 {api_context}
