@@ -1513,7 +1513,9 @@ body[data-role="student"] .role-identity-marker {
 
 @media (max-width: 992px) {
   .dashboard-shell { grid-template-columns: 1fr; }
-  .sidebar { position: sticky; top: 0; z-index: 20; }
+  .sidebar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 14px; width: 100%; height: auto; }
+  .sidebar::before { display: none; }
+  .sidebar .nav-item { padding: 8px 12px; font-size: 13px; border-radius: 10px; white-space: nowrap; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .overview-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
@@ -1533,17 +1535,23 @@ body[data-role="student"] .role-identity-marker {
   }
   .role-identity-label { white-space: normal; }
 
-  /* 移动端：表格弹性滚动 */
+  /* 移动端适配 */
+  .kpi .value { font-size: 24px; }
+  .section-head h5 { font-size: 15px; }
+  .main-area { padding: 14px; }
+  .section-card { padding: 14px; }
+  .kpi-card .kpi-value { font-size: 20px; }
+  .dashboard-chart-grid,
+  .monitor-panel-grid { grid-template-columns: 1fr; gap: 12px; }
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .table-wrap table { min-width: 600px; }
-
-  /* 移动端：操作按钮换行 */
   .toolbar { flex-wrap: wrap; gap: 8px; }
-  .toolbar .btn { flex: 1 1 auto; min-width: 0; }
-
-  /* 移动端：模态框全屏 */
-  .modal-dialog { margin: 8px; }
+  .toolbar .btn { flex: 1 1 auto; min-width: 0; font-size: 13px; padding: 6px 12px; }
+  .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); }
   .modal-content { border-radius: 12px; }
+  .modal-body { padding: 16px; }
+  .topbar { padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
+  .form-control, .form-select { font-size: 16px; } /* iOS 防止自动缩放 */
 }
 
 .metric-row {
@@ -1659,16 +1667,32 @@ body[data-role="student"] .role-identity-marker {
   .topbar { flex-direction: column; align-items: stretch; }
   .toolbar .form-control, .toolbar .form-select { max-width: 100%; width: 100%; }
 
-  /* 移动端小屏：登录页左侧隐藏，表格行高紧凑 */
+  /* 移动端小屏 */
   .auth-hero { display: none; }
   .auth-body { padding: 16px !important; }
-  .table-wrap table { font-size: 13px; }
-  .table-wrap td, .table-wrap th { padding: 6px 8px !important; }
-  .btn-sm { font-size: 12px; padding: 4px 10px; }
+  .auth-card { border-radius: 0; min-height: 100vh; }
+  .page-shell.auth-shell { align-items: stretch; }
+  .table-wrap { margin: 0 -14px; border-radius: 0; }
+  .table-wrap table { font-size: 12px; min-width: 500px; }
+  .table-wrap td, .table-wrap th { padding: 5px 6px !important; }
+  .btn-sm { font-size: 12px; padding: 4px 8px; }
+  .kpi { padding: 12px; }
+  .kpi .value { font-size: 22px; }
+  .kpi-card { padding: 12px; }
+  .kpi-card .kpi-value { font-size: 18px; }
 
   /* 侧边栏紧凑导航 */
-  .sidebar { padding: 12px 10px; }
-  .sidebar .nav-item { padding: 10px 10px; font-size: 13px; gap: 8px; }
+  .sidebar { padding: 8px 10px; gap: 3px; }
+  .sidebar .nav-item { padding: 7px 10px; font-size: 12px; gap: 6px; border-radius: 8px; }
+
+  /* 顶部栏紧凑 */
+  .topbar { padding: 8px 12px; }
+  .topbar .btn { font-size: 12px; padding: 4px 8px; }
+
+  /* 全局字体调整 */
+  .section-head { flex-wrap: wrap; gap: 8px; }
+  h6 { font-size: 14px; }
+  .overview-stat { font-size: 16px; }
 }
 
 /* kpi-card 兼容 */
