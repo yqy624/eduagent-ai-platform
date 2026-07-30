@@ -48,6 +48,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./static:/app/static:ro
+      - ./index.html:/app/static/index.html:ro
     depends_on:
       - backend
 
