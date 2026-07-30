@@ -1,0 +1,4 @@
+[build]
+  base = "static"
+  publish = "."
+
