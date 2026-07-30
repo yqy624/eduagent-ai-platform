@@ -1,0 +1,31 @@
+from app.models.models import (
+    User,
+    Course,
+    Enrollment,
+    Assignment,
+    Submission,
+    PeerReview,
+    Notification,
+    AuditLog,
+    Student,
+    PublishedActivity,
+    StoredFile,
+    TeacherCommentMemory,
+    TeacherCommentUsageHistory,
+)
+
+__all__ = [
+    "User",
+    "Course",
+    "Enrollment",
+    "Assignment",
+    "Submission",
+    "PeerReview",
+    "Notification",
+    "AuditLog",
+    "Student",
+    "PublishedActivity",
+    "StoredFile",
+    "TeacherCommentMemory",
+    "TeacherCommentUsageHistory",
+]

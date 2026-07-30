@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学生工作台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+  <script src="/static/js/echarts.min.js?v=20260730"></script>
+  <link href="/static/css/app.css?v=20260730" rel="stylesheet">
+  <style>
+    .global-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .global-overview-item{border:1px solid var(--border);border-radius:14px;background:var(--bg-soft);padding:14px;min-height:96px}
+    .global-overview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+    .global-overview-label{font-size:13px;color:var(--text-muted)}
+    .global-overview-value{font-size:24px;font-weight:800;color:var(--text-main);line-height:1}
+    .global-overview-progress{height:8px;border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden}
+    .global-overview-progress span{display:block;height:100%;border-radius:999px;background:var(--accent)}
+    .global-next-action{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-card)}
+    .ai-workspace-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.75fr);gap:14px}
+    .ai-mode-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .ai-mode-button{border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-main);padding:7px 12px;font-size:13px}
+    .ai-mode-button.active{border-color:var(--accent);background:var(--accent);color:#fff}
+    .ai-chat-history{display:flex;flex-direction:column;gap:12px;max-height:520px;overflow:auto;padding:4px}
+    .ai-chat-message{display:flex;flex-direction:column;gap:4px;max-width:92%}
+    .ai-chat-message.user{align-self:flex-end;align-items:flex-end}
+    .ai-chat-message.assistant{align-self:flex-start;align-items:flex-start}
+    .ai-chat-bubble{border:1px solid var(--border);border-radius:12px;padding:10px 12px;white-space:pre-wrap;line-height:1.55}
+    .ai-chat-message.user .ai-chat-bubble{background:var(--accent);border-color:var(--accent);color:#fff}
+    .ai-chat-message.assistant .ai-chat-bubble{background:var(--bg-soft)}
+    .ai-chat-meta{font-size:11px;color:var(--text-muted)}
+    .ai-chat-citations{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px}
+    .ai-session-list{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto}
+    .ai-session-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--border);border-radius:8px;background:var(--bg-soft);padding:10px}
+    .ai-session-open{border:0;background:transparent;color:var(--text-main);padding:0;text-align:left;min-width:0}
+    .ai-session-title{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ai-session-meta{font-size:12px;color:var(--text-muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ai-session-actions{display:flex;gap:6px}
+    .ai-session-actions .btn{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+    .learning-course-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .learning-course-item,.learning-task-item,.learning-grade-item,.learning-peer-item{border:1px solid var(--border);border-radius:14px;background:var(--bg-card);padding:16px;box-shadow:var(--shadow-sm)}
+    .learning-course-item{display:flex;flex-direction:column;gap:12px;min-height:190px}
+    .learning-course-head,.learning-task-head,.learning-grade-head,.learning-peer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .learning-course-title,.learning-task-title,.learning-grade-title{font-weight:800;color:var(--text-main);line-height:1.35}
+    .learning-meta-list{display:grid;gap:8px;color:var(--text-muted);font-size:13px}
+    .learning-meta-list span{display:flex;align-items:center;gap:8px;min-width:0}
+    .learning-progress{height:8px;border-radius:999px;background:rgba(148,163,184,.18);overflow:hidden}
+    .learning-progress span{display:block;height:100%;border-radius:999px;background:var(--accent)}
+    .learning-task-list,.learning-grade-list,.learning-peer-list{display:grid;gap:12px}
+    .learning-task-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center}
+    .learning-task-copy{min-width:0}
+    .learning-task-desc{margin-top:8px;color:var(--text-muted);font-size:13px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .learning-task-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+    .learning-grade-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,.35fr);gap:14px;align-items:center}
+    .learning-score{font-size:34px;font-weight:900;color:var(--accent);line-height:1;text-align:right}
+    .learning-feedback{color:var(--text-muted);font-size:13px;line-height:1.6;margin-top:8px}
+    .learning-peer-item{display:grid;gap:12px}
+    .learning-ai-readiness-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+    .learning-ai-readiness-card{border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);padding:12px}
+    .learning-ai-readiness-card strong{display:block;color:var(--text-main);font-size:18px;line-height:1.1}
+    .learning-ai-readiness-card span{display:block;color:var(--text-muted);font-size:12px;margin-top:5px}
+    .ai-prompt-grid{display:grid;gap:8px}
+    .ai-prompt-btn{width:100%;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);color:var(--text-main);padding:10px 12px;text-align:left;font-size:13px;line-height:1.45}
+    .ai-prompt-btn:hover{border-color:var(--accent);color:var(--accent)}
+    @media (max-width: 992px){.ai-workspace-grid{grid-template-columns:1fr}.learning-task-item,.learning-grade-item{grid-template-columns:1fr}.learning-score{text-align:left}.learning-task-actions{justify-content:flex-start}}
+    @media (max-width: 576px){.global-overview-grid{grid-template-columns:1fr}.global-next-action,.learning-course-head,.learning-task-head,.learning-grade-head{align-items:flex-start;flex-direction:column}.learning-course-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body class="page-shell" data-role="student">
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="d-flex align-items-center gap-2 mb-4">
+      <div class="brand-mark"><i class="fa-solid fa-user-graduate"></i></div>
+      <div>
+        <div class="fw-bold">学生工作台</div>
+        <div class="small text-white-50">选课、作业、互评、成绩</div>
+      </div>
+    </div>
+    <div class="nav-item active" data-tab="dashboard"><i class="fa-solid fa-chart-line"></i> 概览</div>
+    <div class="nav-item" data-tab="courses"><i class="fa-solid fa-book"></i> 课程</div>
+    <div class="nav-item" data-tab="assignments"><i class="fa-solid fa-file-circle-check"></i> 作业</div>
+    <div class="nav-item" data-tab="peer-reviews"><i class="fa-solid fa-comments"></i> 互评</div>
+    <div class="nav-item" data-tab="grades"><i class="fa-solid fa-chart-column"></i> 成绩</div>
+    <div class="nav-item" data-tab="ai-agent"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Agent</div>
+  </aside>
+  <main class="main-area">
+    <div class="topbar mb-3">
+      <div>
+        <div class="fw-semibold" id="titleText">概览</div>
+        <div class="breadcrumb-bar p-0" id="breadcrumb"></div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <button id="themeToggle" class="btn btn-outline-secondary btn-sm" onclick="App.toggleTheme()"><i class="fa-solid fa-moon"></i></button>
+        <div class="notif-wrap">
+          <button class="notif-btn" onclick="App.toggleNotifPanel()"><i class="fa-regular fa-bell"></i><span class="notif-badge" id="notifBadge">0</span></button>
+          <div class="notif-panel" id="notifPanel">
+            <div class="notif-head d-flex justify-content-between"><span>通知中心</span><a href="javascript:;" onclick="App.markAllRead()">全部已读</a></div>
+            <div id="notifBody"></div>
+          </div>
+        </div>
+        <button class="btn btn-link p-0 text-decoration-none fw-semibold text-body" id="userName" type="button" onclick="openProfileModal()" title="个人主页">学生</button>
+        <a href="javascript:App.logout()" class="logout-link text-decoration-none text-muted small" title="退出登录">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </a>
+      </div>
+    </div>
+
+    <section id="view-dashboard" class="view">
+      <div class="hero-banner mb-3">
+        <div class="eyebrow"><i class="fa-solid fa-user-graduate"></i> 学习概览</div>
+        <div class="title">欢迎回来，<span id="heroName">同学</span></div>
+        <div class="desc">查看课程进度、待提交作业、匿名互评和最新成绩，合理规划学习时间。</div>
+      </div>
+      <div class="workflow-guide mb-3" aria-label="学生演示流程">
+        <div class="workflow-guide-head">
+          <div>
+            <div class="workflow-guide-kicker">开源演示路径</div>
+            <div class="workflow-guide-title">从选课到学习计划，学生能看到任务、反馈和 AI 支持的完整路径。</div>
+          </div>
+          <span class="workflow-guide-badge">Student Flow</span>
+        </div>
+        <div class="workflow-steps">
+          <div class="workflow-step"><span>1</span><strong>选择课程</strong><small>加入课程后同步看到作业任务。</small></div>
+          <div class="workflow-step"><span>2</span><strong>提交作业</strong><small>文本和附件都进入教师评分流程。</small></div>
+          <div class="workflow-step"><span>3</span><strong>完成互评</strong><small>匿名评价为课堂反馈补充视角。</small></div>
+          <div class="workflow-step"><span>4</span><strong>查看成绩反馈</strong><small>成绩、评语和互评加分集中展示。</small></div>
+          <div class="workflow-step"><span>5</span><strong>生成学习计划</strong><small>AI 根据薄弱点给出一周学习安排。</small></div>
+        </div>
+      </div>
+      <div class="kpi-grid mb-3" id="kpiGrid"></div>
+      <div class="row g-3 align-items-stretch">
+        <div class="col-lg-6"><div class="section-card dashboard-card-fill"><div class="section-head"><h5 class="mb-0">学习全局盘点</h5><span class="metric-muted">任务、批改、互评一眼看清</span></div><div class="card-body-fill"><div id="studentGlobalPanel"></div></div></div></div>
+        <div class="col-lg-6"><div class="section-card dashboard-card-fill" id="recentBox"></div></div>
+      </div>
+    </section>
+
+    <section id="view-courses" class="view d-none">
+      <div class="section-card"><div id="courseBox"></div></div>
+    </section>
+    <section id="view-assignments" class="view d-none">
+      <div class="section-card"><div id="assignmentBox"></div></div>
+    </section>
+    <section id="view-peer-reviews" class="view d-none">
+      <div class="section-card"><div id="peerReviewBox"></div></div>
+    </section>
+    <section id="view-grades" class="view d-none">
+      <div class="section-card"><div id="gradeBox"></div></div>
+    </section>
+    <section id="view-ai-agent" class="view d-none">
+      <div class="section-card" id="studentAiBox"></div>
+    </section>
+  </main>
+</div>
+
+<div class="modal fade" id="profileModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">个人主页</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label class="form-label" for="profileUsername">用户名</label>
+        <input id="profileUsername" class="form-control mb-2" disabled>
+        <label class="form-label" for="profileDisplayName">姓名</label>
+        <input id="profileDisplayName" class="form-control mb-2" maxlength="50" placeholder="请输入姓名">
+        <label class="form-label" for="profileEmail">邮箱</label>
+        <input id="profileEmail" type="email" class="form-control mb-2" maxlength="100" placeholder="请输入邮箱">
+        <label class="form-label" for="profilePassword">新密码</label>
+        <input id="profilePassword" type="password" class="form-control" placeholder="不修改请留空">
+        <div class="form-text">密码留空时不会修改原密码。</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="saveProfile()">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="submitModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">提交作业</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="submitAssignmentId">
+        <div class="mb-2 fw-semibold" id="submitTitle"></div>
+        <div class="mb-2 small text-muted" id="submittedPreview"></div>
+        <textarea id="submitContent" class="form-control mb-3" rows="4" placeholder="填写作业内容"></textarea>
+        <input type="file" id="submitFile" class="form-control">
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="submitAssignment()">提交</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="peerReviewModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">匿名互评</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="peerAssignmentId">
+        <input type="hidden" id="peerTargetSubmissionId">
+        <div class="mb-2 fw-semibold" id="peerReviewAssignmentTitle"></div>
+        <div class="mb-3 small text-muted" id="peerReviewPrompt"></div>
+        <label class="form-label" for="peerTargetSelect">评价对象</label>
+        <select id="peerTargetSelect" class="form-select mb-2" onchange="changePeerTarget(this.value)"></select>
+        <div class="small text-muted mb-3" id="peerTargetMeta"></div>
+        <div class="p-3 border rounded bg-light-subtle mb-3">
+          <div class="small text-muted mb-1">被评作业内容</div>
+          <div id="peerReviewPreview" style="white-space: pre-wrap;"></div>
+        </div>
+        <div class="p-3 border rounded bg-light-subtle mb-3">
+          <div class="small text-muted mb-1">附件信息</div>
+          <div id="peerReviewFiles" style="white-space: pre-wrap;"></div>
+        </div>
+        <label class="form-label" for="peerRating">评价星级</label>
+        <select id="peerRating" class="form-select mb-3">
+          <option value="5">5 分</option>
+          <option value="4">4 分</option>
+          <option value="3">3 分</option>
+          <option value="2">2 分</option>
+          <option value="1">1 分</option>
+        </select>
+        <label class="form-label" for="peerComment">评价内容</label>
+        <textarea id="peerComment" class="form-control" rows="5" placeholder="请给出不少于 10 个字的合理评价"></textarea>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="submitPeerReview()">提交互评</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="submitDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">提交详情</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2 fw-semibold" id="detailAssignmentTitle"></div>
+        <div class="small text-muted mb-3" id="detailSubmissionStatus"></div>
+        <div class="p-3 border rounded bg-light-subtle mb-3">
+          <div class="small text-muted mb-1">作业要求</div>
+          <div id="detailAssignmentRequirement" style="white-space:pre-wrap;"></div>
+        </div>
+        <div class="p-3 border rounded bg-light-subtle mb-3">
+          <div class="small text-muted mb-1">作业详情</div>
+          <div id="detailAssignmentDetail" style="white-space:pre-wrap;"></div>
+        </div>
+        <div class="p-3 border rounded bg-light-subtle mb-3">
+          <div class="small text-muted mb-1">提交内容</div>
+          <div id="detailSubmissionContent" style="white-space:pre-wrap;"></div>
+        </div>
+        <div class="p-3 border rounded bg-light-subtle">
+          <div class="small text-muted mb-2">附件</div>
+          <div id="detailSubmissionFiles"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">关闭</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js?v=20260730"></script>
+<script>
+window.TOKEN = new URLSearchParams(location.search).get("token") || localStorage.getItem("token") || "";
+if (!TOKEN) location.href = "/";
+App.initTheme();
+App.initNotifications(TOKEN);
+App.setBreadcrumb(["学生工作台", "概览"]);
+var displayName = localStorage.getItem("displayName") || "学生";
+document.getElementById("userName").textContent = displayName;
+document.getElementById("heroName").textContent = displayName;
+
+var tabs = Array.from(document.querySelectorAll(".nav-item"));
+var coursePage = 1;
+var assignmentPage = 1;
+var gradePage = 1;
+var activityPage = 1;
+var pageSize = 5;
+var assignmentSubmissions = {};
+var studentAssignmentsById = {};
+var peerReviewGroups = [];
+var studentAiCourses = [];
+var studentAiMode = localStorage.getItem("studentAiMode") || "course_material";
+var studentAiMessages = readStudentAiMessages();
+var studentAiSessions = readStudentAiSessions();
+var studentAiModeLabels = {
+  course_material: "课程资料",
+  assignment_submission: "作业提交",
+  teaching_advice: "教学建议",
+  other: "其他问题"
+};
+function readStudentAiMessages() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("studentAiMessages") || "[]");
+    return Array.isArray(saved) ? saved.slice(-30) : [];
+  } catch (err) {
+    return [];
+  }
+}
+function saveStudentAiMessages() {
+  localStorage.setItem("studentAiMessages", JSON.stringify(studentAiMessages.slice(-30)));
+}
+function readStudentAiSessions() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("studentAiSessions") || "[]");
+    return Array.isArray(saved) ? saved.slice(0, 20) : [];
+  } catch (err) {
+    return [];
+  }
+}
+function saveStudentAiSessions() {
+  localStorage.setItem("studentAiSessions", JSON.stringify(studentAiSessions.slice(0, 20)));
+}
+function getStudentAiCourseName(courseId) {
+  var id = Number(courseId || 0);
+  var course = studentAiCourses.find(function(item) { return Number(item.id) === id; });
+  return course ? (course.name || "未命名课程") : "未选择课程";
+}
+function makeStudentAiSessionTitle(messages) {
+  var firstQuestion = (messages || []).find(function(item) { return item.role === "user" && item.text; });
+  var title = firstQuestion ? firstQuestion.text.trim() : "AI 对话";
+  return title.length > 24 ? title.slice(0, 24) + "..." : title;
+}
+function formatStudentAiSessionTime(value) {
+  if (!value) return "";
+  var date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+function setStudentAiMode(mode) {
+  studentAiMode = studentAiModeLabels[mode] ? mode : "other";
+  localStorage.setItem("studentAiMode", studentAiMode);
+  document.querySelectorAll("#studentAiModes .ai-mode-button").forEach(function(button) {
+    button.classList.toggle("active", button.dataset.mode === studentAiMode);
+  });
+}
+function renderStudentAiCitations(citations) {
+  if (!citations || !citations.length) return "";
+  return '<div class="ai-chat-citations"><div class="fw-semibold mb-1">课程资料引用</div>' +
+    citations.map(function(c) {
+      return '<div>' + App.escapeHtml(c.source || "课程资料") + ' · chunk ' +
+        (c.chunkIndex != null ? c.chunkIndex : c.chunk_index || 0) + ' · 相似度 ' +
+        Number(c.similarity || c.score || 0).toFixed(2) + '</div>';
+    }).join("") + '</div>';
+}
+function renderStudentAiChat() {
+  var history = document.getElementById("studentAiChatHistory");
+  if (!history) return;
+  if (!studentAiMessages.length) {
+    history.innerHTML = '<div class="text-muted small">从上面的分类开始提问，助手会记住本次浏览器中的对话，并结合账户历史继续回答。</div>';
+    return;
+  }
+  history.innerHTML = studentAiMessages.map(function(item) {
+    var roleLabel = item.role === "user" ? "我" : "助手";
+    return '<div class="ai-chat-message ' + (item.role === "user" ? "user" : "assistant") + '">' +
+      '<div class="ai-chat-meta">' + roleLabel + (item.mode ? ' · ' + App.escapeHtml(studentAiModeLabels[item.mode] || item.mode) : '') + '</div>' +
+      '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderStudentAiCitations(item.citations) + '</div></div>';
+  }).join("");
+  history.scrollTop = history.scrollHeight;
+}
+function renderStudentAiSessions() {
+  var list = document.getElementById("studentAiSessionList");
+  if (!list) return;
+  if (!studentAiSessions.length) {
+    list.innerHTML = '<div class="text-muted small">结束当前对话后，会话包会出现在这里，后续可以重新打开或下载备份。</div>';
+    return;
+  }
+  list.innerHTML = studentAiSessions.map(function(session) {
+    var modeText = studentAiModeLabels[session.mode] || session.mode || "对话";
+    var meta = (session.courseName || "未选择课程") + " · " + modeText + " · " + (session.messageCount || (session.messages || []).length) + " 条";
+    return '<div class="ai-session-item">' +
+      '<button type="button" class="ai-session-open" data-id="' + App.escapeAttr(session.id) + '" onclick="openStudentAiSession(this.dataset.id)" title="打开会话">' +
+        '<div class="ai-session-title">' + App.escapeHtml(session.title || "AI 对话") + '</div>' +
+        '<div class="ai-session-meta">' + App.escapeHtml(formatStudentAiSessionTime(session.endedAt) + " · " + meta) + '</div>' +
+      '</button>' +
+      '<div class="ai-session-actions">' +
+        '<button type="button" class="btn btn-outline-secondary btn-sm" data-id="' + App.escapeAttr(session.id) + '" onclick="downloadStudentAiSession(this.dataset.id)" title="下载会话包"><i class="fa-solid fa-download"></i></button>' +
+        '<button type="button" class="btn btn-outline-danger btn-sm" data-id="' + App.escapeAttr(session.id) + '" onclick="deleteStudentAiSession(this.dataset.id)" title="删除会话"><i class="fa-solid fa-trash"></i></button>' +
+      '</div>' +
+    '</div>';
+  }).join("");
+}
+function endStudentAiSession() {
+  if (!studentAiMessages.length) {
+    App.showToast("当前没有可结束的对话", "warning");
+    return;
+  }
+  var courseEl = document.getElementById("studentAiCourse");
+  var courseId = courseEl && courseEl.value ? Number(courseEl.value) : null;
+  var now = new Date().toISOString();
+  var messages = studentAiMessages.map(function(item) { return Object.assign({}, item); });
+  var session = {
+    id: "session_" + Date.now(),
+    title: makeStudentAiSessionTitle(messages),
+    courseId: courseId,
+    courseName: getStudentAiCourseName(courseId),
+    mode: studentAiMode,
+    createdAt: messages[0] && messages[0].createdAt ? messages[0].createdAt : now,
+    endedAt: now,
+    messageCount: messages.length,
+    messages: messages
+  };
+  studentAiSessions.unshift(session);
+  studentAiSessions = studentAiSessions.slice(0, 20);
+  saveStudentAiSessions();
+  studentAiMessages = [];
+  saveStudentAiMessages();
+  renderStudentAiChat();
+  renderStudentAiSessions();
+  App.showToast("对话已结束并保存到历史会话");
+}
+function openStudentAiSession(sessionId) {
+  var session = studentAiSessions.find(function(item) { return item.id === sessionId; });
+  if (!session) return;
+  if (session.mode) setStudentAiMode(session.mode);
+  var courseEl = document.getElementById("studentAiCourse");
+  if (courseEl && session.courseId) courseEl.value = String(session.courseId);
+  studentAiMessages = (session.messages || []).map(function(item) { return Object.assign({}, item); }).slice(-30);
+  saveStudentAiMessages();
+  renderStudentAiChat();
+  App.showToast("已打开历史会话");
+}
+function downloadStudentAiSession(sessionId) {
+  var session = studentAiSessions.find(function(item) { return item.id === sessionId; });
+  if (!session) return;
+  var blob = new Blob([JSON.stringify(session, null, 2)], { type: "application/json;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement("a");
+  link.href = url;
+  link.download = (session.title || "eduagent-session").replace(/[\\/:*?"<>|]/g, "_") + ".json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+function deleteStudentAiSession(sessionId) {
+  if (!window.confirm("确定删除这条历史会话吗？")) return;
+  studentAiSessions = studentAiSessions.filter(function(item) { return item.id !== sessionId; });
+  saveStudentAiSessions();
+  renderStudentAiSessions();
+  App.showToast("历史会话已删除");
+}
+function hasEcharts() {
+  return typeof window.echarts !== "undefined";
+}
+function scheduleVisibleChartResize(ids) {
+  requestAnimationFrame(function() {
+    (ids || []).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el || !hasEcharts()) return;
+      var chart = echarts.getInstanceByDom(el);
+      if (chart && chart.resize) chart.resize();
+    });
+  });
+}
+function parseApiErrorPayload(payload, fallback) {
+  if (!payload) return fallback;
+  if (typeof payload === "string") return payload;
+  return payload.message || payload.error || fallback;
+}
+tabs.forEach(function(el) { el.addEventListener("click", function() { switchTab(el.dataset.tab); }); });
+function switchTab(tab) {
+  tabs.forEach(function(x) { x.classList.toggle("active", x.dataset.tab === tab); });
+  document.querySelectorAll(".view").forEach(function(v) { v.classList.add("d-none"); });
+  document.getElementById("view-" + tab).classList.remove("d-none");
+  var title = {dashboard:"概览", courses:"课程", assignments:"作业", "peer-reviews":"互评", grades:"成绩", "ai-agent":"AI Agent"}[tab];
+  document.getElementById("titleText").textContent = title;
+  App.setBreadcrumb(["学生工作台", title]);
+  if (tab === "dashboard") {
+    loadDashboard();
+  }
+  if (tab === "courses") loadCourses();
+  if (tab === "assignments") loadAssignments();
+  if (tab === "peer-reviews") loadPeerReviews();
+  if (tab === "grades") loadGrades();
+  if (tab === "ai-agent") loadStudentAiAgent();
+}
+
+async function api(url, method, body) {
+  return App.request(url, method, body);
+}
+
+async function openProfileModal() {
+  try {
+    var profile = await api("/profile");
+    profileUsername.value = profile.username || "";
+    profileDisplayName.value = profile.displayName || "";
+    profileEmail.value = profile.email || "";
+    profilePassword.value = "";
+    new bootstrap.Modal(profileModal).show();
+  } catch (err) {
+    alert(err.message || "加载个人资料失败");
+  }
+}
+
+async function saveProfile() {
+  try {
+    var payload = {
+      display_name: profileDisplayName.value.trim(),
+      email: profileEmail.value.trim(),
+      new_password: profilePassword.value.trim()
+    };
+    if (!payload.new_password) delete payload.new_password;
+    var profile = await api("/profile", "PUT", payload);
+    var name = profile.displayName || profile.username || "学生";
+    localStorage.setItem("displayName", name);
+    document.getElementById("userName").textContent = name;
+    document.getElementById("heroName").textContent = name;
+    bootstrap.Modal.getInstance(profileModal).hide();
+    alert("个人资料已更新");
+  } catch (err) {
+    alert(err.message || "保存失败");
+  }
+}
+
+function handleKpiKey(event, tab) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    switchTab(tab);
+  }
+}
+
+function renderPager(total, page, target, action) {
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  var html = '<div class="d-flex justify-content-end align-items-center gap-2 mt-3"><span class="small text-muted">每页 ' + pageSize + ' 行，第 ' + page + ' / ' + pages + ' 页</span>';
+  html += '<button class="btn btn-outline-secondary btn-sm" onclick="' + action + '(' + Math.max(1, page - 1) + ')" ' + (page <= 1 ? "disabled" : "") + '>上一页</button>';
+  for (var i = 1; i <= pages; i++) {
+    html += '<button class="btn ' + (i === page ? "btn-primary" : "btn-outline-secondary") + ' btn-sm" onclick="' + action + '(' + i + ')">' + i + '</button>';
+  }
+  html += '<button class="btn btn-outline-secondary btn-sm" onclick="' + action + '(' + Math.min(pages, page + 1) + ')" ' + (page >= pages ? "disabled" : "") + '>下一页</button></div>';
+  return html;
+}
+
+function renderEmptyPanel(title, desc, compact, actionLabel, actionHandler, icon) {
+  var action = actionLabel && actionHandler
+    ? '<div class="empty-panel-actions"><button class="btn btn-primary btn-sm" type="button" onclick="' + actionHandler + '"><i class="fa-solid ' + (icon || 'fa-arrow-right') + ' me-1"></i>' + App.escapeHtml(actionLabel) + '</button></div>'
+    : '';
+  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div>' + action + '</div></div>';
+}
+
+function dashboardField(data, camelKey, snakeKey, fallback) {
+  if (!data) return fallback;
+  if (data[camelKey] != null) return data[camelKey];
+  if (snakeKey && data[snakeKey] != null) return data[snakeKey];
+  return fallback;
+}
+
+function dashboardList(data, camelKey, snakeKey) {
+  var value = dashboardField(data, camelKey, snakeKey, []);
+  return Array.isArray(value) ? value : [];
+}
+
+function percentValue(done, total) {
+  if (!total) return 0;
+  return Math.max(0, Math.min(100, Math.round(done / total * 100)));
+}
+
+function renderActivityPager(total, page, action) {
+  var pages = Math.max(1, Math.ceil(total / 3));
+  if (pages <= 1) return '';
+  var html = '<div class="activity-pager"><button class="btn btn-outline-secondary btn-sm" onclick="' + action + '(' + Math.max(1, page - 1) + ')" ' + (page <= 1 ? 'disabled' : '') + '>上一页</button>';
+  for (var i = 1; i <= pages; i++) {
+    html += '<button class="btn ' + (i === page ? 'btn-primary' : 'btn-outline-secondary') + ' btn-sm" onclick="' + action + '(' + i + ')">' + i + '</button>';
+  }
+  html += '<button class="btn btn-outline-secondary btn-sm" onclick="' + action + '(' + Math.min(pages, page + 1) + ')" ' + (page >= pages ? 'disabled' : '') + '>下一页</button></div>';
+  return html;
+}
+
+function goStudentActivityPage(page) {
+  activityPage = page;
+  loadDashboard();
+}
+
+async function loadDashboard() {
+  try {
+    var dashboard = await api('/student/dashboard');
+    var recentGrades = dashboardList(dashboard, "recentGrades", "recent_grades");
+    var activities = dashboardList(dashboard, "recentActivities", "recent_activities");
+    var selectedCourseCount = Number(dashboardField(dashboard, "selectedCourseCount", "selected_course_count", 0) || 0);
+    var gradedCount = Number(dashboardField(dashboard, "gradedCount", "graded_count", 0) || 0);
+    var peerReviewBonus = Number(dashboardField(dashboard, "peerReviewBonus", "peer_review_bonus", 0) || 0);
+    var pendingCount = Number(dashboardField(dashboard, "pendingCount", "pending_count", 0) || 0);
+    var submittedPendingCount = Number(dashboardField(dashboard, "submittedPendingCount", "submitted_pending_count", 0) || 0);
+    document.getElementById("kpiGrid").innerHTML = [
+      { label: "已选课程", value: selectedCourseCount, color: "var(--accent)", tab: "courses" },
+      { label: "已评分作业", value: gradedCount, color: "var(--accent-2)", tab: "grades" },
+      { label: "互评加分", value: peerReviewBonus.toFixed(1), color: "var(--accent-3)", tab: "peer-reviews" },
+      { label: "待提交", value: pendingCount, color: "var(--accent-4)", tab: "assignments" }
+    ].map(function(k) { return '<div class="kpi" role="button" tabindex="0" onclick="switchTab(\'' + k.tab + '\')" onkeydown="handleKpiKey(event, \'' + k.tab + '\')" style="border-left:4px solid ' + k.color + '"><div class="value">' + k.value + '</div><div class="label">' + k.label + '</div></div>'; }).join("");
+
+    renderStudentGlobalPanel({
+      selectedCourseCount: selectedCourseCount,
+      gradedCount: gradedCount,
+      peerReviewBonus: peerReviewBonus,
+      pendingCount: pendingCount,
+      submittedPendingCount: submittedPendingCount,
+      recentGrades: recentGrades
+    });
+
+    var recentHtml = '<div class="section-head"><h5 class="mb-0">最近成绩</h5><span class="metric-muted">最近 6 条评分结果</span></div><div class="card-body-fill">';
+    if (recentGrades.length) {
+      recentHtml += '<div class="table-wrap">' + recentGrades.map(function(x) {
+        var courseName = x.courseName ? App.escapeHtml(x.courseName) : '未关联课程';
+        return '<div class="d-flex justify-content-between align-items-center py-2 border-bottom"><div><div class="fw-semibold">' + App.escapeHtml(x.assignmentTitle || '未命名作业') + '</div><div class="small text-muted">' + courseName + '</div></div><span class="badge-soft bg-primary bg-opacity-10 text-primary fw-bold" style="font-size:16px">' + x.score + '</span></div>';
+      }).join('') + '</div>';
+    } else {
+      recentHtml += renderEmptyPanel('暂无最近成绩', '老师完成批改后，这里会显示最新成绩摘要。', true);
+    }
+    recentHtml += '</div>';
+    if (activities.length) {
+      var activityPages = Math.max(1, Math.ceil(activities.length / 3));
+      if (activityPage > activityPages) activityPage = activityPages;
+      var activityStart = (activityPage - 1) * 3;
+      var pageActivities = activities.slice(activityStart, activityStart + 3);
+      recentHtml += '<div class="section-head mt-3"><h6 class="mb-0">近期活动</h6><span class="metric-muted">管理员最新发布</span></div><div class="activity-page-list">' + pageActivities.map(function(item) {
+        return '<div class="activity-item"><div class="activity-title">' + App.escapeHtml(item.title || '平台活动') + '</div><div class="activity-content">' + App.escapeHtml(item.content || '暂无活动内容') + '</div><div class="activity-meta">' + App.timeAgo(item.publishedAt || item.createdAt) + '</div></div>';
+      }).join('') + '</div>' + renderActivityPager(activities.length, activityPage, 'goStudentActivityPage');
+    } else {
+      recentHtml += '<div class="section-head mt-3"><h6 class="mb-0">近期活动</h6></div>' + renderEmptyPanel('暂无近期活动', '管理员发布活动后，会在这里展示校园动态。', true);
+    }
+    document.getElementById("recentBox").innerHTML = recentHtml;
+
+  } catch (err) {
+    document.getElementById("kpiGrid").innerHTML = renderEmptyPanel('概览加载失败', err.message || '暂时无法加载学生概览数据。', false);
+    document.getElementById("recentBox").innerHTML = renderEmptyPanel('暂无近期内容', '学生首页加载失败，请稍后重试。', false);
+    document.getElementById("studentGlobalPanel").innerHTML = renderEmptyPanel('暂无学习盘点', '当前学习全局盘点暂时无法渲染，请稍后刷新重试。', false);
+    console.error(err);
+  }
+}
+
+function renderStudentGlobalPanel(summary) {
+  var knownTasks = summary.pendingCount + summary.submittedPendingCount + summary.gradedCount;
+  var closedLoopRate = percentValue(summary.gradedCount, knownTasks);
+  var waitingRate = percentValue(summary.submittedPendingCount, knownTasks);
+  var latestScore = summary.recentGrades.length ? summary.recentGrades[0].score : null;
+  var next = summary.pendingCount > 0
+    ? { title: "优先完成待提交作业", desc: "还有作业未进入提交状态，先把入口清空最稳。", tab: "assignments", icon: "fa-file-circle-check" }
+    : summary.submittedPendingCount > 0
+      ? { title: "关注待批改结果", desc: "已提交作业正在等待老师反馈，可以顺手查看课程材料。", tab: "grades", icon: "fa-clock" }
+      : { title: "复盘最近成绩", desc: "当前没有待提交任务，适合查看成绩反馈和互评收益。", tab: "grades", icon: "fa-chart-column" };
+
+  var cards = [
+    { label: "任务闭环", value: closedLoopRate + "%", desc: summary.gradedCount + " 个已评分 / " + knownTasks + " 个已知任务", progress: closedLoopRate, color: "var(--accent)" },
+    { label: "待提交压力", value: summary.pendingCount, desc: summary.pendingCount ? "需要尽快处理" : "当前清爽", progress: percentValue(summary.pendingCount, Math.max(knownTasks, 1)), color: "var(--accent-4)" },
+    { label: "待批改", value: summary.submittedPendingCount, desc: waitingRate + "% 的任务在等反馈", progress: waitingRate, color: "var(--accent-2)" },
+    { label: "最近成绩", value: latestScore == null ? "-" : latestScore, desc: "互评加分 " + summary.peerReviewBonus.toFixed(1), progress: latestScore == null ? 0 : percentValue(Number(latestScore), 100), color: "var(--accent-3)" }
+  ];
+
+  document.getElementById("studentGlobalPanel").innerHTML =
+    '<div class="global-overview-grid">' + cards.map(function(item) {
+      return '<div class="global-overview-item">' +
+        '<div class="global-overview-head"><div><div class="global-overview-label">' + App.escapeHtml(item.label) + '</div><div class="small text-muted">' + App.escapeHtml(item.desc) + '</div></div><div class="global-overview-value">' + App.escapeHtml(item.value) + '</div></div>' +
+        '<div class="global-overview-progress"><span style="width:' + item.progress + '%;background:' + item.color + '"></span></div>' +
+      '</div>';
+    }).join('') + '</div>' +
+    '<button class="global-next-action text-start" type="button" onclick="switchTab(\'' + next.tab + '\')">' +
+      '<span><span class="fw-semibold d-block"><i class="fa-solid ' + next.icon + ' me-2" style="color:var(--accent)"></i>' + App.escapeHtml(next.title) + '</span><span class="small text-muted">' + App.escapeHtml(next.desc) + '</span></span>' +
+      '<i class="fa-solid fa-chevron-right text-muted"></i>' +
+    '</button>';
+}
+
+async function loadCourses() {
+  var courses = await api("/student/courses");
+  var myCourses = await api("/student/my-courses");
+  var myIds = {};
+  myCourses.forEach(function(c) { myIds[c.id] = true; });
+  if (!courses.length) {
+    document.getElementById("courseBox").innerHTML = '<div class="section-head"><h5 class="mb-0">课程列表</h5></div>' + renderEmptyPanel('暂无可选课程', '当前没有可选课程，稍后可再次刷新查看。', false, '刷新课程', 'loadCourses()', 'fa-rotate');
+    return;
+  }
+  var pages = Math.max(1, Math.ceil(courses.length / pageSize));
+  if (coursePage > pages) coursePage = pages;
+  var start = (coursePage - 1) * pageSize;
+  var pageCourses = courses.slice(start, start + pageSize);
+  document.getElementById("courseBox").innerHTML = '<div class="section-head"><h5 class="mb-0">课程列表</h5><span class="metric-muted">共 ' + courses.length + ' 门课程</span></div><div class="learning-course-grid">' +
+    pageCourses.map(function(c) {
+      var enrolled = myIds[c.id];
+      var maxStudents = Number(c.maxStudents || 50);
+      var enrolledCount = Number(c.enrolledCount || 0);
+      var capacity = percentValue(enrolledCount, maxStudents);
+      return '<div class="learning-course-item">' +
+        '<div class="learning-course-head"><div><div class="learning-course-title">' + App.escapeHtml(c.name || '未命名课程') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(c.description || '暂无课程简介') + '</div></div>' +
+        (enrolled ? '<span class="badge-soft bg-success bg-opacity-10 text-success"><i class="fa-solid fa-check me-1"></i>已加入</span>' : '<span class="badge-soft bg-primary bg-opacity-10 text-primary">可选</span>') + '</div>' +
+        '<div class="learning-meta-list">' +
+          '<span><i class="fa-solid fa-user-tie"></i>' + App.escapeHtml(c.teacherName || '未分配教师') + '</span>' +
+          '<span><i class="fa-solid fa-calendar-days"></i>' + App.escapeHtml(c.schedule || '时间待定') + '</span>' +
+          '<span><i class="fa-solid fa-graduation-cap"></i>' + (c.credits != null ? c.credits : '未设置') + ' 学分</span>' +
+        '</div>' +
+        '<div><div class="d-flex justify-content-between small text-muted mb-1"><span>课程容量</span><span>' + enrolledCount + '/' + maxStudents + '</span></div><div class="learning-progress"><span style="width:' + capacity + '%"></span></div></div>' +
+        '<div class="mt-auto">' + (enrolled ? '<button class="btn btn-outline-primary btn-sm" onclick="switchTab(\'assignments\')"><i class="fa-solid fa-file-circle-check me-1"></i>查看作业</button>' : '<button class="btn btn-primary btn-sm" onclick="enrollCourse(' + c.id + ')"><i class="fa-solid fa-plus me-1"></i>加入课程</button>') + '</div>' +
+      '</div>';
+    }).join('') + '</div>' + renderPager(courses.length, coursePage, 'courses', 'goCoursePage');
+}
+
+function goCoursePage(page) {
+  coursePage = page;
+  loadCourses();
+}
+
+async function enrollCourse(id) {
+  try {
+    await api("/student/enroll/" + id, "POST");
+    loadCourses();
+    loadDashboard();
+    App.showToast("选课成功");
+  } catch (err) {
+    App.showToast(err.message || "选课失败", "danger");
+  }
+}
+
+async function loadAssignments() {
+  var courses = await api("/student/my-courses");
+  var grades = await api("/student/grades");
+  assignmentSubmissions = {};
+  studentAssignmentsById = {};
+  grades.forEach(function(g) { if (g.assignmentId) assignmentSubmissions[g.assignmentId] = g; });
+  var rows = [];
+  for (var ci = 0; ci < courses.length; ci++) {
+    var c = courses[ci];
+    var assignments = await api("/student/courses/" + c.id + "/assignments");
+    assignments.forEach(function(a) {
+      studentAssignmentsById[a.id] = a;
+      var submission = assignmentSubmissions[a.id] || (a.submissionId ? {
+        assignmentId: a.id,
+        assignmentTitle: a.title,
+        status: a.submissionStatus,
+        content: a.content,
+        filePaths: a.filePaths,
+        fileName: a.fileName
+      } : null);
+      rows.push({ course: c, assignment: a, submission: submission });
+    });
+  }
+  if (!rows.length) {
+    document.getElementById("assignmentBox").innerHTML = '<div class="section-head"><h5 class="mb-0">作业列表</h5></div>' + renderEmptyPanel('暂无作业任务', '选课后发布的作业会集中显示在这里。', false, '去选课', "switchTab('courses')", 'fa-book');
+    return;
+  }
+  var pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  if (assignmentPage > pages) assignmentPage = pages;
+  var start = (assignmentPage - 1) * pageSize;
+  var pageRows = rows.slice(start, start + pageSize);
+  var html = '<div class="section-head"><h5 class="mb-0">学习任务</h5><span class="metric-muted">共 ' + rows.length + ' 项作业</span></div><div class="learning-task-list">';
+  pageRows.forEach(function(row, index) {
+    var c = row.course;
+    var a = row.assignment;
+    var submitted = row.submission && row.submission.content ? App.escapeHtml(row.submission.content) : '尚未提交正文';
+    var detailBtn = '<button class="btn btn-outline-secondary btn-sm me-2" onclick="openSubmissionDetail(' + a.id + ')"><i class="fa-solid fa-eye me-1"></i>详情</button>';
+    var canSubmit = a.status !== 'CLOSED' && a.submissionStatus !== 'GRADED';
+    var submitText = row.submission ? '重新提交' : '提交';
+    if (a.status === 'CLOSED') submitText = '已截止';
+    if (a.submissionStatus === 'GRADED') submitText = '已评分';
+    var status = a.submissionStatus === 'GRADED'
+      ? { text: '已评分', cls: 'bg-success bg-opacity-10 text-success', icon: 'fa-circle-check' }
+      : row.submission
+        ? { text: '已提交', cls: 'bg-warning bg-opacity-10 text-warning', icon: 'fa-clock' }
+        : a.status === 'CLOSED'
+          ? { text: '已截止', cls: 'bg-secondary bg-opacity-10 text-secondary', icon: 'fa-lock' }
+          : { text: '待提交', cls: 'bg-danger bg-opacity-10 text-danger', icon: 'fa-hourglass-half' };
+    var peerBadge = a.peerReviewEnabled ? '<span class="badge-soft bg-info bg-opacity-10 text-info"><i class="fa-solid fa-comments me-1"></i>互评开放</span>' : '<span class="badge-soft bg-secondary bg-opacity-10 text-secondary">互评未开放</span>';
+    html += '<div class="learning-task-item">' +
+      '<div class="learning-task-copy">' +
+        '<div class="learning-task-head"><div><div class="learning-task-title">' + App.escapeHtml(a.title || '未命名作业') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(c.name || '未命名课程') + ' · 截止 ' + (App.fmtTime(a.dueDate) || '无截止时间') + ' · 满分 ' + (a.totalPoints || 100) + '</div></div><span class="badge-soft ' + status.cls + '"><i class="fa-solid ' + status.icon + ' me-1"></i>' + status.text + '</span></div>' +
+        '<div class="learning-task-desc">' + App.escapeHtml(a.description || a.detail || submitted) + '</div>' +
+        '<div class="d-flex flex-wrap gap-2 mt-3"><span class="badge-soft bg-primary bg-opacity-10 text-primary"><i class="fa-solid fa-file-lines me-1"></i>' + submitted + '</span>' + peerBadge + '</div>' +
+      '</div>' +
+      '<div class="learning-task-actions">' + detailBtn + '<button class="btn btn-primary btn-sm" data-title="' + App.escapeAttr(a.title || '未命名作业') + '" onclick="openSubmit(' + a.id + ', this.dataset.title)" ' + (canSubmit ? '' : 'disabled') + '><i class="fa-solid fa-upload me-1"></i>' + submitText + '</button></div>' +
+    '</div>';
+  });
+  document.getElementById("assignmentBox").innerHTML = html + '</div>' + renderPager(rows.length, assignmentPage, 'assignments', 'goAssignmentPage');
+}
+
+function goAssignmentPage(page) {
+  assignmentPage = page;
+  loadAssignments();
+}
+
+function previewStoredFile(path) {
+  return App.previewFile(path);
+}
+
+function downloadStoredFile(path, name) {
+  var fileId = App.getStoredFileId(path);
+  if (!fileId) return Promise.reject(new Error('File identifier is invalid'));
+  return App.downloadFile('/files/' + encodeURIComponent(fileId) + '/download', name || '附件');
+}
+
+function openSubmissionDetail(id) {
+  var submission = assignmentSubmissions[id];
+  var assignment = studentAssignmentsById[id] || {};
+  if (!submission && assignment.submissionId) {
+    submission = {
+      assignmentId: id,
+      assignmentTitle: assignment.title,
+      status: assignment.submissionStatus,
+      content: assignment.content,
+      filePaths: assignment.filePaths,
+      fileName: assignment.fileName
+    };
+  }
+  detailAssignmentTitle.textContent = assignment.title || (submission && submission.assignmentTitle) || '未命名作业';
+  var statusMap = { GRADED: '已评分', SUBMITTED: '已提交', PENDING: '待提交' };
+  var status = submission ? submission.status : (assignment.submissionStatus || 'NOT_SUBMITTED');
+  detailSubmissionStatus.textContent = '状态：' + (statusMap[status] || '未提交');
+  detailAssignmentRequirement.textContent = assignment.description || '暂无作业要求';
+  detailAssignmentDetail.textContent = assignment.detail || '暂无作业详情';
+  detailSubmissionContent.textContent = submission && submission.content ? submission.content : '暂无提交内容';
+  var files = App.parseStoredFiles(submission ? submission.filePaths : '');
+  detailSubmissionFiles.innerHTML = files.length
+    ? '<div class="d-flex flex-column gap-2">' + files.map(function(file) {
+        var safeName = App.escapeHtml(file.name || '附件');
+        var safePathAttr = App.escapeAttr(file.path || '');
+        var safeNameAttr = App.escapeAttr(file.name || '附件');
+        return '<div class="d-flex align-items-center justify-content-between gap-3 border rounded px-3 py-2 bg-white"><div><i class="fa-solid fa-paperclip me-2"></i>' + safeName + '</div><div class="d-flex gap-2"><button class="btn btn-outline-secondary btn-sm" data-path="' + safePathAttr + '" onclick="previewStoredFile(this.dataset.path)">预览</button><button class="btn btn-outline-primary btn-sm" data-path="' + safePathAttr + '" data-name="' + safeNameAttr + '" onclick="downloadStoredFile(this.dataset.path, this.dataset.name)">下载</button></div></div>';
+      }).join('') + '</div>'
+    : '<div class="text-muted small">本次提交没有附件</div>';
+  new bootstrap.Modal(submitDetailModal).show();
+}
+
+function openSubmit(id, title) {
+  var submission = assignmentSubmissions[id];
+  submitAssignmentId.value = id;
+  submitTitle.textContent = title || '未命名作业';
+  submitContent.value = submission && submission.content ? submission.content : '';
+  submittedPreview.innerHTML = submission && submission.content ? '已提交内容：' + App.escapeHtml(submission.content) : '当前暂无提交内容';
+  submitFile.value = '';
+  new bootstrap.Modal(submitModal).show();
+}
+
+async function submitAssignment() {
+  var id = submitAssignmentId.value;
+  var filePath = null;
+  var fileName = null;
+  if (submitFile.files.length) {
+    var fd = new FormData();
+    fd.append("file", submitFile.files[0]);
+    var res = await fetch("/api/files/upload", { method: "POST", headers: { Authorization: "Bearer " + TOKEN }, body: fd });
+    var data = await res.json();
+    if (data.code !== 200) throw new Error(data.message || "上传失败");
+    filePath = data.data.id;
+    fileName = data.data.originalName;
+  }
+  await api("/student/assignments/" + id + "/submit", "POST", {
+    content: submitContent.value.trim(),
+    file_path: filePath,
+    file_name: fileName
+  });
+  bootstrap.Modal.getInstance(submitModal).hide();
+  loadAssignments();
+  loadDashboard();
+}
+
+async function loadPeerReviews() {
+  peerReviewGroups = await api("/student/peer-reviews");
+  var html = '<div class="section-head"><h5 class="mb-0">匿名互评</h5></div>';
+  if (!peerReviewGroups.length) {
+    document.getElementById("peerReviewBox").innerHTML = html + renderEmptyPanel('暂无互评任务', '教师开放互评后，这里会显示可评价的匿名作业。', false, '查看作业', "switchTab('assignments')", 'fa-file-circle-check');
+    return;
+  }
+  html += '<div class="learning-peer-list">';
+  peerReviewGroups.forEach(function(group) {
+    html += '<div class="learning-peer-item"><div class="learning-peer-head"><div><div class="learning-task-title">' + App.escapeHtml(group.assignmentTitle || '互评任务') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(group.courseName || '未关联课程') + ' · ' + App.escapeHtml(group.prompt || '请根据作业质量给出客观、具体的匿名评价。') + '</div></div><div class="text-end"><span class="badge-soft bg-primary bg-opacity-10 text-primary">已完成 ' + group.completedCount + ' / ' + group.requiredCount + '</span><div class="fw-semibold text-primary mt-2">已获加分 ' + Number(group.bonusEarned || 0).toFixed(1) + '</div></div></div>';
+    html += '<div class="learning-task-list">';
+    group.reviews.forEach(function(item, index) {
+      var statusText = item.status === 'BONUS_GRANTED' ? '已加分' : item.status === 'SUBMITTED' ? '已提交' : '待评价';
+      var statusClass = item.status === 'BONUS_GRANTED' ? 'bg-success bg-opacity-10 text-success' : item.status === 'SUBMITTED' ? 'bg-warning bg-opacity-10 text-warning' : 'bg-secondary bg-opacity-10 text-secondary';
+      var target = item.selectedTarget || (item.candidateTargets && item.candidateTargets.length ? item.candidateTargets[0] : null);
+      var targetName = target ? App.escapeHtml(target.studentName || '同学') : '-';
+      var content = target ? App.escapeHtml(target.content || '-') : App.escapeHtml(item.preview || '-');
+      html += '<div class="learning-task-item"><div class="learning-task-copy">' +
+        '<div class="learning-task-head"><div><div class="fw-semibold">评价对象：' + targetName + '</div><div class="small text-muted mt-1">评分 ' + (item.rating != null ? item.rating + ' / 5' : '待填写') + (item.submittedAt ? ' · ' + App.fmtTime(item.submittedAt) : '') + '</div></div><span class="badge-soft ' + statusClass + '">' + statusText + '</span></div>' +
+        '<div class="learning-task-desc">' + content + '</div>' +
+        '<div class="learning-feedback">' + App.escapeHtml(item.comment || '提交互评后，这里会保留你的评价意见。') + '</div>' +
+      '</div><div class="learning-task-actions">' + (item.status === 'ASSIGNED' ? '<button class="btn btn-primary btn-sm" onclick="openPeerReviewModal(' + group.assignmentId + ', ' + index + ')"><i class="fa-solid fa-pen-to-square me-1"></i>去互评</button>' : '<span class="small text-muted">已处理</span>') + '</div></div>';
+    });
+    html += '</div></div>';
+  });
+  document.getElementById("peerReviewBox").innerHTML = html + '</div>';
+}
+
+function openPeerReviewModal(assignmentId, reviewIndex) {
+  var group = peerReviewGroups.find(function(x) { return x.assignmentId === assignmentId; });
+  if (!group) return;
+  var item = (group.reviews || [])[reviewIndex];
+  if (!item) return;
+  peerAssignmentId.value = assignmentId;
+  peerReviewAssignmentTitle.textContent = group.courseName + ' / ' + group.assignmentTitle;
+  peerReviewPrompt.textContent = group.prompt || '请结合内容质量、完整性和表达清晰度给出客观评价。';
+
+  var candidates = item.candidateTargets || [];
+  peerTargetSelect.innerHTML = candidates.map(function(target) {
+    return '<option value="' + target.submissionId + '">' + App.escapeHtml(target.studentName || '同学') + '</option>';
+  }).join('');
+
+  var selectedTarget = item.selectedTarget || (candidates.length ? candidates[0] : null);
+  if (selectedTarget) {
+    peerTargetSelect.value = String(selectedTarget.submissionId);
+    applyPeerTarget(selectedTarget);
+  } else {
+    peerTargetSubmissionId.value = '';
+    peerTargetMeta.textContent = '';
+    peerReviewPreview.textContent = '';
+    peerReviewFiles.textContent = '';
+  }
+
+  peerRating.value = item.rating != null ? String(item.rating) : '5';
+  peerComment.value = item.comment || '';
+  new bootstrap.Modal(peerReviewModal).show();
+}
+
+function changePeerTarget(targetSubmissionId) {
+  var assignmentId = Number(peerAssignmentId.value || 0);
+  var group = peerReviewGroups.find(function(x) { return x.assignmentId === assignmentId; });
+  if (!group) return;
+  var candidates = [];
+  (group.reviews || []).forEach(function(item) {
+    if (item.candidateTargets && item.candidateTargets.length) {
+      candidates = item.candidateTargets;
+    }
+  });
+  var selected = candidates.find(function(target) { return String(target.submissionId) === String(targetSubmissionId); });
+  if (selected) {
+    applyPeerTarget(selected);
+  }
+}
+
+function applyPeerTarget(target) {
+  peerTargetSubmissionId.value = target.submissionId;
+  peerTargetMeta.textContent = '评价对象：' + (target.studentName || '同学') + (target.submittedAt ? ' · 提交时间 ' + App.fmtTime(target.submittedAt) : '');
+  peerReviewPreview.textContent = target.content || '';
+  peerReviewFiles.textContent = target.filePaths ? App.parseStoredFiles(target.filePaths).map(function(file) { return file.name || '附件'; }).join('、') : '无附件';
+}
+
+async function submitPeerReview() {
+  var assignmentId = peerAssignmentId.value;
+  var targetSubmissionId = peerTargetSubmissionId.value;
+  await api('/student/peer-reviews/' + assignmentId + '/' + targetSubmissionId, 'POST', {
+    rating: Number(peerRating.value),
+    comment: peerComment.value.trim()
+  });
+  bootstrap.Modal.getInstance(peerReviewModal).hide();
+  loadPeerReviews();
+  loadGrades();
+  loadDashboard();
+}
+
+async function loadGrades() {
+  var grades = await api("/student/grades");
+  if (!grades.length) {
+    document.getElementById("gradeBox").innerHTML = '<div class="section-head"><h5 class="mb-0">成绩列表</h5></div>' + renderEmptyPanel('暂无成绩记录', '老师完成批改后，这里会显示课程成绩、评语和互评分。', false, '查看作业', "switchTab('assignments')", 'fa-file-circle-check');
+    return;
+  }
+  var pages = Math.max(1, Math.ceil(grades.length / pageSize));
+  if (gradePage > pages) gradePage = pages;
+  var start = (gradePage - 1) * pageSize;
+  var pageGrades = grades.slice(start, start + pageSize);
+  document.getElementById("gradeBox").innerHTML = '<div class="section-head"><h5 class="mb-0">成绩反馈</h5><span class="metric-muted">共 ' + grades.length + ' 条记录</span></div><div class="learning-grade-list">' +
+    pageGrades.map(function(g) {
+      var statusMap = { GRADED: '已评分', SUBMITTED: '已提交', PENDING: '待提交' };
+      var statusText = statusMap[g.status] || '未提交';
+      var statusBadge = g.status === 'GRADED' ? 'bg-success bg-opacity-10 text-success' : g.status === 'SUBMITTED' ? 'bg-warning bg-opacity-10 text-warning' : 'bg-secondary bg-opacity-10 text-secondary';
+      var score = g.score != null ? g.score : '-';
+      return '<div class="learning-grade-item">' +
+        '<div><div class="learning-grade-head"><div><div class="learning-grade-title">' + App.escapeHtml(g.assignmentTitle || '未命名作业') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(g.courseName || '未关联课程') + ' · ' + App.escapeHtml(g.content || '暂无提交内容') + '</div></div><span class="badge-soft ' + statusBadge + '">' + App.escapeHtml(statusText) + '</span></div>' +
+        '<div class="learning-feedback"><i class="fa-solid fa-comment-dots me-1"></i>' + App.escapeHtml(g.teacherComment || '老师完成评语后会在这里展示。') + '</div>' +
+        '<div class="d-flex flex-wrap gap-2 mt-3"><span class="badge-soft bg-primary bg-opacity-10 text-primary">教师分 ' + (g.teacherScore != null ? g.teacherScore : '-') + '</span><span class="badge-soft bg-info bg-opacity-10 text-info">互评加分 ' + Number(g.peerReviewBonus || 0).toFixed(1) + '</span></div></div>' +
+        '<div><div class="small text-muted text-end">总分</div><div class="learning-score">' + score + '</div><button class="btn btn-outline-primary btn-sm w-100 mt-3" onclick="switchTab(\'assignments\')"><i class="fa-solid fa-file-lines me-1"></i>查看作业</button></div>' +
+      '</div>';
+    }).join('') + '</div>' + renderPager(grades.length, gradePage, 'grades', 'goGradePage');
+}
+
+function goGradePage(page) {
+  gradePage = page;
+  loadGrades();
+}
+
+function setStudentAiPrompt(text, mode) {
+  var input = document.getElementById("studentAiQuestion");
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+  if (mode && studentAiModeLabels[mode]) {
+    setStudentAiMode(mode);
+  }
+}
+
+async function loadStudentAiAgent() {
+  var box = document.getElementById("studentAiBox");
+  box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">课程资料、个人学习数据与校园问答</span></div><div class="text-muted small">加载中...</div>';
+  try {
+    studentAiCourses = await api("/student/my-courses");
+    var studentAiGrades = await api("/student/grades");
+    var options = studentAiCourses.length ? studentAiCourses.map(function(c) {
+      return '<option value="' + c.id + '">' + App.escapeHtml(c.name || '未命名课程') + '</option>';
+    }).join('') : '<option value="">暂无课程</option>';
+    var promptButtons = [
+      { label: "解释当前课程的重点", text: "请用适合复习的方式总结这门课最近需要掌握的重点。", mode: "course_material" },
+      { label: "分析我的薄弱点", text: "请根据我的作业和成绩反馈，指出最应该优先补强的 3 个点。", mode: "learning_analysis" },
+      { label: "生成一周学习安排", text: "请把我的复习任务拆成一周计划，每天给出重点和预计用时。", mode: "teaching_advice" },
+      { label: "校园事务咨询", text: "如果我遇到课程学习或平台使用问题，应该按什么步骤处理？", mode: "campus_faq" }
+    ];
+    box.innerHTML =
+      '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">连续对话与个性化学习助手</span></div>' +
+      '<div class="ai-workspace-grid">' +
+        '<div class="section-surface">' +
+          '<label class="form-label" for="studentAiCourse">课程</label><select id="studentAiCourse" class="form-select mb-2" ' + (!studentAiCourses.length ? 'disabled' : '') + '>' + options + '</select>' +
+          (!studentAiCourses.length ? '<div class="small text-muted mb-3">请先在课程页完成选课，再使用课程问答和学习计划。</div>' : '<div class="small text-muted mb-3">学习计划会结合当前课程的作业、成绩、互评和薄弱点生成。</div>') +
+          '<div class="learning-ai-readiness-grid">' +
+            '<div class="learning-ai-readiness-card"><strong>' + studentAiCourses.length + '</strong><span>已选课程</span></div>' +
+            '<div class="learning-ai-readiness-card"><strong>' + studentAiGrades.length + '</strong><span>学习记录</span></div>' +
+            '<div class="learning-ai-readiness-card"><strong>' + studentAiSessions.length + '</strong><span>历史会话</span></div>' +
+          '</div>' +
+          '<div id="studentAiModes" class="ai-mode-tabs" role="tablist">' +
+            Object.keys(studentAiModeLabels).map(function(mode) {
+              return '<button type="button" class="ai-mode-button ' + (mode === studentAiMode ? 'active' : '') + '" data-mode="' + mode + '" onclick="setStudentAiMode(\'' + mode + '\')">' + studentAiModeLabels[mode] + '</button>';
+            }).join("") +
+          '</div>' +
+          '<label class="form-label" for="studentAiQuestion">对话内容</label><textarea id="studentAiQuestion" class="form-control mb-2" rows="3" placeholder="先选择问题分类，再输入你的问题"></textarea>' +
+          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="askStudentCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>发送</button><button class="btn btn-outline-primary btn-sm" onclick="generateStudentPlan()" ' + (!studentAiCourses.length ? 'disabled' : '') + '><i class="fa-solid fa-calendar-check me-1"></i>生成学习计划</button><button class="btn btn-outline-secondary btn-sm" onclick="endStudentAiSession()"><i class="fa-solid fa-box-archive me-1"></i>结束对话</button></div>' +
+          '<div id="studentAiChatHistory" class="ai-chat-history"></div>' +
+        '</div>' +
+        '<div class="section-surface">' +
+          '<div class="fw-semibold mb-2">建议提问</div>' +
+          '<div class="ai-prompt-grid mb-3">' + promptButtons.map(function(item) {
+            return '<button type="button" class="ai-prompt-btn" data-text="' + App.escapeAttr(item.text) + '" data-mode="' + item.mode + '" onclick="setStudentAiPrompt(this.dataset.text, this.dataset.mode)"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>' + App.escapeHtml(item.label) + '</button>';
+          }).join('') + '</div>' +
+          '<div class="d-flex align-items-center justify-content-between gap-2 mb-2"><div class="fw-semibold">历史会话</div><span class="badge-soft bg-primary bg-opacity-10 text-primary">本机保存</span></div>' +
+          '<div class="small text-muted mb-3">结束当前对话后，会话包会保存到这里，后续可以打开继续查看，也可以下载 JSON 备份。</div>' +
+          '<div class="ai-readiness mb-3">' +
+            '<div class="fw-semibold mb-2">使用前检查</div>' +
+            '<ul class="ai-readiness-list">' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>课程资料问答依赖教师端完成资料上传和索引。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>学习计划依赖作业提交、成绩反馈和互评记录。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>没有历史数据时，AI 会优先给出通用学习建议。</span></li>' +
+            '</ul>' +
+          '</div>' +
+          '<div id="studentAiSessionList" class="ai-session-list"></div>' +
+        '</div>' +
+      '</div>';
+    renderStudentAiChat();
+    renderStudentAiSessions();
+  } catch (err) {
+    box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false, '重新加载', 'loadStudentAiAgent()', 'fa-rotate');
+  }
+}
+
+async function askStudentCourseQa() {
+  var courseEl = document.getElementById("studentAiCourse");
+  var courseId = courseEl && courseEl.value ? Number(courseEl.value) : null;
+  var question = document.getElementById("studentAiQuestion").value.trim();
+  if (!question) {
+    App.showToast('请先输入问题', 'warning');
+    return;
+  }
+  var answerBox = document.getElementById("studentAiChatHistory");
+  answerBox.innerHTML = '<div class="text-muted small">正在回复...</div>';
+  try {
+    var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: studentAiMode });
+    var now = new Date().toISOString();
+    studentAiMessages.push({ role: "user", text: question, mode: studentAiMode, createdAt: now });
+    studentAiMessages.push({ role: "assistant", text: data.answer || "", mode: studentAiMode, citations: data.citations || [], createdAt: new Date().toISOString() });
+    saveStudentAiMessages();
+    document.getElementById("studentAiQuestion").value = "";
+    renderStudentAiChat();
+  } catch (err) {
+    answerBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '问答失败') + '</span>';
+  }
+}
+
+async function generateStudentPlan() {
+  var courseId = document.getElementById("studentAiCourse").value;
+  if (!courseId) {
+    App.showToast('请先选择课程', 'warning');
+    return;
+  }
+  var answerBox = document.getElementById("studentAiChatHistory");
+  answerBox.innerHTML = '<div class="text-muted small">正在生成学习计划...</div>';
+  try {
+    var data = await api('/ai/me/learning-plan?course_id=' + encodeURIComponent(courseId), 'POST', {});
+    var tasks = data.dailyTasks || data.daily_tasks || [];
+    var basis = data.basis || [];
+    var planText = '学习计划已生成：' + (data.weaknessSummary || data.weakness_summary || '已根据当前课程学习数据生成') +
+      (tasks.length ? '\n' + tasks.map(function(item) {
+        return (item.day || '-') + '：' + (item.focus || '-') + '，' + (item.duration_hours || item.durationHours || 0) + ' 小时，优先级 ' + (item.priority || '-');
+      }).join('\n') : '') +
+      (basis.length ? '\n依据：' + basis.map(function(item) { return item.name + ' ' + item.value; }).join('，') : '');
+    studentAiMessages.push({ role: "assistant", text: planText, mode: "teaching_advice", createdAt: new Date().toISOString() });
+    saveStudentAiMessages();
+    renderStudentAiChat();
+  } catch (err) {
+    answerBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '生成学习计划失败') + '</span>';
+  }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

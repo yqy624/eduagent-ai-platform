@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" font-family="'Segoe UI', -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="api" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0f3460"/>
+      <stop offset="100%" stop-color="#1a5276"/>
+    </linearGradient>
+    <linearGradient id="biz" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b4332"/>
+      <stop offset="100%" stop-color="#2d6a4f"/>
+    </linearGradient>
+    <linearGradient id="agent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5c2d91"/>
+      <stop offset="100%" stop-color="#7b2d8b"/>
+    </linearGradient>
+    <linearGradient id="data" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e07c24"/>
+      <stop offset="100%" stop-color="#d35400"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1200" height="680" fill="#f8f9fa" rx="8"/>
+
+  <!-- 标题 -->
+  <rect width="1200" height="56" fill="url(#header)" rx="8"/>
+  <text x="600" y="36" text-anchor="middle" fill="white" font-size="20" font-weight="bold">EduAgent 智慧教育 Agent 平台 — 架构图</text>
+
+  <!-- ============ 层级 1: API 层 ============ -->
+  <rect x="30" y="72" width="1140" height="64" rx="6" fill="url(#api)" filter="url(#shadow)"/>
+  <text x="50" y="100" fill="#85c1e9" font-size="13" font-weight="bold">API 层</text>
+  <text x="50" y="120" fill="#aed6f1" font-size="11">FastAPI Routers</text>
+  
+  <!-- API 组 -->
+  <rect x="280" y="80" width="130" height="26" rx="4" fill="#2980b9" opacity="0.8"/>
+  <text x="345" y="97" text-anchor="middle" fill="white" font-size="11">/api/auth/*</text>
+  <rect x="420" y="80" width="130" height="26" rx="4" fill="#2980b9" opacity="0.8"/>
+  <text x="485" y="97" text-anchor="middle" fill="white" font-size="11">/api/admin/*</text>
+  <rect x="560" y="80" width="130" height="26" rx="4" fill="#2980b9" opacity="0.8"/>
+  <text x="625" y="97" text-anchor="middle" fill="white" font-size="11">/api/teacher/*</text>
+  <rect x="700" y="80" width="130" height="26" rx="4" fill="#2980b9" opacity="0.8"/>
+  <text x="765" y="97" text-anchor="middle" fill="white" font-size="11">/api/student/*</text>
+  <rect x="840" y="80" width="130" height="26" rx="4" fill="#2980b9" opacity="0.8"/>
+  <text x="905" y="97" text-anchor="middle" fill="white" font-size="11">/api/ai/*</text>
+
+  <!-- 箭头: API → 业务 -->
+  <line x1="600" y1="136" x2="600" y2="160" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#666"/>
+    </marker>
+  </defs>
+
+  <!-- ============ 层级 2: 业务层 ============ -->
+  <rect x="30" y="164" width="1140" height="80" rx="6" fill="url(#biz)" filter="url(#shadow)"/>
+  <text x="50" y="192" fill="#81c784" font-size="13" font-weight="bold">业务层</text>
+  <text x="50" y="212" fill="#a5d6a7" font-size="11">Services + RBAC 权限</text>
+
+  <rect x="280" y="178" width="110" height="22" rx="3" fill="#388e3c" opacity="0.8"/>
+  <text x="335" y="193" text-anchor="middle" fill="white" font-size="10">Auth Service</text>
+  <rect x="400" y="178" width="110" height="22" rx="3" fill="#388e3c" opacity="0.8"/>
+  <text x="455" y="193" text-anchor="middle" fill="white" font-size="10">Course Service</text>
+  <rect x="520" y="178" width="110" height="22" rx="3" fill="#388e3c" opacity="0.8"/>
+  <text x="575" y="193" text-anchor="middle" fill="white" font-size="10">Assignment Svc</text>
+  <rect x="640" y="178" width="110" height="22" rx="3" fill="#388e3c" opacity="0.8"/>
+  <text x="695" y="193" text-anchor="middle" fill="white" font-size="10">Grade Service</text>
+  <rect x="760" y="178" width="110" height="22" rx="3" fill="#388e3c" opacity="0.8"/>
+  <text x="815" y="193" text-anchor="middle" fill="white" font-size="10">Student Service</text>
+  <rect x="880" y="178" width="110" height="22" rx="3" fill="#388e3c" opacity="0.8"/>
+  <text x="935" y="193" text-anchor="middle" fill="white" font-size="10">Admin Service</text>
+
+  <!-- JWT + RBAC 标注 -->
+  <rect x="50" y="200" width="170" height="20" rx="10" fill="#2e7d32" opacity="0.5"/>
+  <text x="135" y="214" text-anchor="middle" fill="#c8e6c9" font-size="9">JWT 认证 · 角色权限检查</text>
+
+  <!-- 箭头: 业务 → Agent -->
+  <line x1="600" y1="244" x2="600" y2="268" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============ 层级 3: Agent 层 ============ -->
+  <rect x="30" y="272" width="1140" height="120" rx="6" fill="url(#agent)" filter="url(#shadow)"/>
+  <text x="50" y="300" fill="#ce93d8" font-size="13" font-weight="bold">Agent 层</text>
+  <text x="50" y="320" fill="#e1bee7" font-size="11">LangGraph 状态机 · 工具编排 · Human-in-the-loop</text>
+
+  <!-- Agent 1: RAG 助教 -->
+  <rect x="50" y="338" width="340" height="42" rx="5" fill="#6a1b9a" opacity="0.7"/>
+  <text x="70" y="356" fill="white" font-size="11" font-weight="bold">课程 RAG 助教 Agent</text>
+  <text x="70" y="372" fill="#ce93d8" font-size="9">课程资料索引 → 语义检索 → 带引用回答 → 拒答</text>
+
+  <!-- Agent 2: 学习路径规划 -->
+  <rect x="410" y="338" width="380" height="42" rx="5" fill="#6a1b9a" opacity="0.7"/>
+  <text x="430" y="356" fill="white" font-size="11" font-weight="bold">学情诊断 · 学习路径规划 Agent</text>
+  <text x="430" y="372" fill="#ce93d8" font-size="9">收集画像 → 薄弱分析 → 检索资料 → 计划任务 → 练习 → 校验保存</text>
+
+  <!-- Agent 3: 批改建议 -->
+  <rect x="810" y="338" width="340" height="42" rx="5" fill="#6a1b9a" opacity="0.7"/>
+  <text x="830" y="356" fill="white" font-size="11" font-weight="bold">教师批改建议 Agent</text>
+  <text x="830" y="372" fill="#ce93d8" font-size="9">加载提交 → 评分标准 → AI 评分 → 评语 → 教师确认</text>
+
+  <!-- 箭头: Agent → Tool -->
+  <line x1="600" y1="392" x2="600" y2="416" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============ 层级 4: 工具层 ============ -->
+  <rect x="30" y="420" width="1140" height="56" rx="6" fill="#3e2723" filter="url(#shadow)"/>
+  <text x="50" y="448" fill="#ffcc80" font-size="13" font-weight="bold">工具层</text>
+  <text x="50" y="464" fill="#ffe0b2" font-size="11">确定性函数 · 通过 Service 访问数据库</text>
+
+  <rect x="280" y="434" width="120" height="24" rx="3" fill="#5d4037" opacity="0.8"/>
+  <text x="340" y="450" text-anchor="middle" fill="#ffcc80" font-size="10">Course Tools</text>
+  <rect x="410" y="434" width="120" height="24" rx="3" fill="#5d4037" opacity="0.8"/>
+  <text x="470" y="450" text-anchor="middle" fill="#ffcc80" font-size="10">Grade Tools</text>
+  <rect x="540" y="434" width="120" height="24" rx="3" fill="#5d4037" opacity="0.8"/>
+  <text x="600" y="450" text-anchor="middle" fill="#ffcc80" font-size="10">Assignment Tools</text>
+  <rect x="670" y="434" width="130" height="24" rx="3" fill="#5d4037" opacity="0.8"/>
+  <text x="735" y="450" text-anchor="middle" fill="#ffcc80" font-size="10">Notification Tools</text>
+
+  <!-- 箭头: Tool → 数据 -->
+  <line x1="300" y1="476" x2="300" y2="500" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="600" y1="476" x2="600" y2="500" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="900" y1="476" x2="900" y2="500" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============ 层级 5: 数据层 ============ -->
+  <rect x="30" y="504" width="1140" height="86" rx="6" fill="url(#data)" filter="url(#shadow)"/>
+  <text x="50" y="532" fill="#f9e79f" font-size="13" font-weight="bold">数据层</text>
+
+  <!-- MySQL -->
+  <rect x="50" y="548" width="280" height="28" rx="4" fill="#b9770e" opacity="0.7"/>
+  <text x="70" y="567" fill="white" font-size="11">MySQL · student_db</text>
+  <text x="190" y="567" fill="#f9e79f" font-size="10">(users, courses, assignments ...)</text>
+
+  <!-- Vector Store -->
+  <rect x="360" y="548" width="280" height="28" rx="4" fill="#b9770e" opacity="0.7"/>
+  <text x="380" y="567" fill="white" font-size="11">Chroma / FAISS 向量库</text>
+  <text x="500" y="567" fill="#f9e79f" font-size="10">(课程文档切片嵌入)</text>
+
+  <!-- AI 辅助表 -->
+  <rect x="670" y="548" width="480" height="28" rx="4" fill="#b9770e" opacity="0.7"/>
+  <text x="690" y="567" fill="white" font-size="11">ai_* 辅助表</text>
+  <text x="760" y="567" fill="#f9e79f" font-size="10">(runs, tool_calls, qa_logs, reports, suggestions ...)</text>
+  <text x="690" y="580" fill="#f9e79f" font-size="9">观测层: 记录每次 Agent 输入、工具调用、输出、耗时、错误</text>
+
+  <!-- ============ 底部: 安全层 ============ -->
+  <rect x="30" y="604" width="1140" height="36" rx="6" fill="#1a1a2e" filter="url(#shadow)"/>
+  <text x="50" y="628" fill="#85c1e9" font-size="11" font-weight="bold">安全层</text>
+  <text x="180" y="628" fill="#aed6f1" font-size="10">JWT 无状态认证</text>
+  <circle cx="320" cy="623" r="2" fill="#85c1e9"/>
+  <text x="330" y="628" fill="#aed6f1" font-size="10">RBAC 角色权限</text>
+  <circle cx="470" cy="623" r="2" fill="#85c1e9"/>
+  <text x="480" y="628" fill="#aed6f1" font-size="10">数据脱敏</text>
+  <circle cx="580" cy="623" r="2" fill="#85c1e9"/>
+  <text x="590" y="628" fill="#aed6f1" font-size="10">Failback 降级</text>
+  <circle cx="710" cy="623" r="2" fill="#85c1e9"/>
+  <text x="720" y="628" fill="#aed6f1" font-size="10">Guardrails 输出校验</text>
+
+  <!-- 图例 -->
+  <rect x="970" y="620" width="30" height="10" rx="2" fill="#b9770e"/>
+  <rect x="970" y="634" width="30" height="10" rx="2" fill="#6a1b9a"/>
+  <rect x="970" y="648" width="30" height="10" rx="2" fill="#388e3c"/>
+  <text x="1006" y="629" fill="#666" font-size="9">数据存储</text>
+  <text x="1006" y="643" fill="#666" font-size="9">Agent 编排</text>
+  <text x="1006" y="657" fill="#666" font-size="9">业务逻辑</text>
+
+  <text x="600" y="675" text-anchor="middle" fill="#999" font-size="9">FastAPI + LangGraph + MySQL + Chroma/FAISS + JWT</text>
+</svg>

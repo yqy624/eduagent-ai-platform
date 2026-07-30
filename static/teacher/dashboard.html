@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>教师工作台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+  <script src="/static/js/echarts.min.js?v=20260730"></script>
+  <link href="/static/css/app.css?v=20260730" rel="stylesheet">
+  <style>
+    .global-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .global-overview-item{border:1px solid var(--border);border-radius:14px;background:var(--bg-soft);padding:14px;min-height:96px}
+    .global-overview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+    .global-overview-label{font-size:13px;color:var(--text-muted)}
+    .global-overview-value{font-size:24px;font-weight:800;color:var(--text-main);line-height:1}
+    .global-overview-progress{height:8px;border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden}
+    .global-overview-progress span{display:block;height:100%;border-radius:999px;background:var(--accent)}
+    .global-next-action{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg-card)}
+    .ai-workspace-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.75fr);gap:14px}
+    .ai-mode-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .ai-mode-button{border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-main);padding:7px 12px;font-size:13px}
+    .ai-mode-button.active{border-color:var(--accent);background:var(--accent);color:#fff}
+    .ai-chat-history{display:flex;flex-direction:column;gap:12px;max-height:520px;overflow:auto;padding:4px}
+    .ai-chat-message{display:flex;flex-direction:column;gap:4px;max-width:92%}
+    .ai-chat-message.user{align-self:flex-end;align-items:flex-end}
+    .ai-chat-message.assistant{align-self:flex-start;align-items:flex-start}
+    .ai-chat-bubble{border:1px solid var(--border);border-radius:12px;padding:10px 12px;white-space:pre-wrap;line-height:1.55}
+    .ai-chat-message.user .ai-chat-bubble{background:var(--accent);border-color:var(--accent);color:#fff}
+    .ai-chat-message.assistant .ai-chat-bubble{background:var(--bg-soft)}
+    .ai-chat-meta{font-size:11px;color:var(--text-muted)}
+    .ai-chat-citations{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px}
+    .teacher-ai-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+    .teacher-ai-status-card{border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);padding:12px}
+    .teacher-ai-status-card strong{display:block;color:var(--text-main);font-size:18px;line-height:1.1}
+    .teacher-ai-status-card span{display:block;color:var(--text-muted);font-size:12px;margin-top:5px}
+    .ai-prompt-grid{display:grid;gap:8px}
+    .ai-prompt-btn{width:100%;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);color:var(--text-main);padding:10px 12px;text-align:left;font-size:13px;line-height:1.45}
+    .ai-prompt-btn:hover{border-color:var(--accent);color:var(--accent)}
+    @media (max-width: 992px){.ai-workspace-grid{grid-template-columns:1fr}}
+    @media (max-width: 576px){.global-overview-grid{grid-template-columns:1fr}.global-next-action{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body class="page-shell" data-role="teacher">
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="d-flex align-items-center gap-2 mb-4">
+      <div class="brand-mark"><i class="fa-solid fa-chalkboard-user"></i></div>
+      <div>
+        <div class="fw-bold">教师工作台</div>
+        <div class="small text-white-50">课程、作业、互评、评分</div>
+      </div>
+    </div>
+    <div class="nav-item active" data-tab="dashboard"><i class="fa-solid fa-chart-line"></i> 概览</div>
+    <div class="nav-item" data-tab="courses"><i class="fa-solid fa-book"></i> 课程</div>
+    <div class="nav-item" data-tab="students"><i class="fa-solid fa-user-graduate"></i> 学生</div>
+    <div class="nav-item" data-tab="assignments"><i class="fa-solid fa-file-circle-plus"></i> 作业</div>
+    <div class="nav-item" data-tab="peer-review"><i class="fa-solid fa-comments"></i> 互评</div>
+    <div class="nav-item" data-tab="grading"><i class="fa-solid fa-pen-nib"></i> 评分</div>
+    <div class="nav-item" data-tab="analysis"><i class="fa-solid fa-chart-column"></i> 分析</div>
+    <div class="nav-item" data-tab="ai-agent"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Agent</div>
+  </aside>
+  <main class="main-area">
+    <div class="topbar mb-3">
+      <div>
+        <div class="fw-semibold" id="titleText">概览</div>
+        <div class="breadcrumb-bar p-0" id="breadcrumb"></div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <button id="themeToggle" class="btn btn-outline-secondary btn-sm" onclick="App.toggleTheme()"><i class="fa-solid fa-moon"></i></button>
+        <div class="notif-wrap">
+          <button class="notif-btn" onclick="App.toggleNotifPanel()"><i class="fa-regular fa-bell"></i><span class="notif-badge" id="notifBadge">0</span></button>
+          <div class="notif-panel" id="notifPanel">
+            <div class="notif-head d-flex justify-content-between"><span>通知中心</span><a href="javascript:;" onclick="App.markAllRead()">全部已读</a></div>
+            <div id="notifBody"></div>
+          </div>
+        </div>
+        <button class="btn btn-link p-0 text-decoration-none fw-semibold text-body" id="userName" type="button" onclick="openProfileModal()" title="个人主页">教师</button>
+        <a href="javascript:App.logout()" class="logout-link text-decoration-none text-muted small" title="退出登录">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </a>
+      </div>
+    </div>
+
+    <section id="view-dashboard" class="view">
+      <div class="hero-banner mb-3">
+        <div class="eyebrow"><i class="fa-solid fa-chalkboard-user"></i> 教师工作台</div>
+        <div class="title">欢迎回来，<span id="heroName">教师</span></div>
+        <div class="desc">管理课程与作业，开放匿名互评，查看学生参与情况和成绩分析。</div>
+      </div>
+      <div class="workflow-guide mb-3" aria-label="教师演示流程">
+        <div class="workflow-guide-head">
+          <div>
+            <div class="workflow-guide-kicker">开源演示路径</div>
+            <div class="workflow-guide-title">课程、作业、RAG 索引、AI 批改和成绩分析形成教学闭环。</div>
+          </div>
+          <span class="workflow-guide-badge">Teacher Flow</span>
+        </div>
+        <div class="workflow-steps">
+          <div class="workflow-step"><span>1</span><strong>新建课程</strong><small>设置课程目标、时间和容量。</small></div>
+          <div class="workflow-step"><span>2</span><strong>发布作业</strong><small>作业详情会参与课程知识库索引。</small></div>
+          <div class="workflow-step"><span>3</span><strong>索引课程资料</strong><small>上传材料后让 AI 基于课程内容回答。</small></div>
+          <div class="workflow-step"><span>4</span><strong>AI 辅助批改</strong><small>教师审核建议后再写回成绩。</small></div>
+          <div class="workflow-step"><span>5</span><strong>查看成绩分析</strong><small>用分布和及格率复盘教学效果。</small></div>
+        </div>
+      </div>
+      <div class="kpi-grid mb-3" id="kpiGrid"></div>
+      <div class="row g-3 align-items-stretch">
+        <div class="col-lg-8"><div class="section-card dashboard-card-fill"><div class="section-head"><h5 class="mb-0">教学全局盘点</h5><span class="metric-muted">课程、学生、互评覆盖一眼看清</span></div><div class="card-body-fill"><div id="teacherGlobalPanel"></div></div></div></div>
+        <div class="col-lg-4"><div class="section-card dashboard-card-fill" id="recentActivityBox"><div class="section-head"><h5 class="mb-0">近期活动</h5><span class="metric-muted">管理员发布动态</span></div><div class="card-body-fill"><div id="recentActivityList" class="text-muted small">加载中...</div></div></div></div>
+      </div>
+    </section>
+    <section id="view-courses" class="view d-none"><div class="section-card" id="courseBox"></div></section>
+    <section id="view-students" class="view d-none"><div class="section-card" id="studentBox"></div></section>
+    <section id="view-assignments" class="view d-none"><div class="section-card" id="assignmentBox"></div></section>
+    <section id="view-peer-review" class="view d-none"><div class="section-card" id="peerReviewManageBox"></div></section>
+    <section id="view-grading" class="view d-none"><div class="section-card" id="gradingBox"></div></section>
+    <section id="view-analysis" class="view d-none"><div class="section-card" id="analysisBox"></div></section>
+    <section id="view-ai-agent" class="view d-none"><div class="section-card" id="teacherAiBox"></div></section>
+  </main>
+</div>
+
+<div class="modal fade" id="profileModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">个人主页</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label class="form-label" for="profileUsername">用户名</label>
+        <input id="profileUsername" class="form-control mb-2" disabled>
+        <label class="form-label" for="profileDisplayName">姓名</label>
+        <input id="profileDisplayName" class="form-control mb-2" maxlength="50" placeholder="请输入姓名">
+        <label class="form-label" for="profileEmail">邮箱</label>
+        <input id="profileEmail" type="email" class="form-control mb-2" maxlength="100" placeholder="请输入邮箱">
+        <label class="form-label" for="profilePassword">新密码</label>
+        <input id="profilePassword" type="password" class="form-control" placeholder="不修改请留空">
+        <div class="form-text">密码留空时不会修改原密码。</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="saveProfile()">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="courseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="courseModalTitle">新建课程</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input id="courseId" type="hidden">
+        <label class="form-label" for="courseName">课程名称</label>
+        <input id="courseName" class="form-control mb-2" placeholder="请输入课程名称">
+        <label class="form-label" for="courseDesc">课程描述</label>
+        <input id="courseDesc" class="form-control mb-2" placeholder="请输入课程描述">
+        <label class="form-label" for="courseSchedule">上课时间</label>
+        <input id="courseSchedule" class="form-control mb-2" placeholder="如 Mon 10:00">
+        <label class="form-label" for="courseMax">可选人数</label>
+        <input id="courseMax" type="number" class="form-control mb-2" value="50">
+        <label class="form-label" for="courseCredits">学分</label>
+        <input id="courseCredits" type="number" class="form-control mb-2" value="3">
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="saveCourse()">保存</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="assignModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="assignModalTitle">发布作业</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input id="assignId" type="hidden">
+        <div class="row g-2">
+          <div class="col-md-6"><label class="form-label" for="assignTitle">作业标题</label><input id="assignTitle" class="form-control" placeholder="请输入作业标题"></div>
+          <div class="col-md-6"><label class="form-label" for="assignCourse">所属课程</label><select id="assignCourse" class="form-select"></select></div>
+          <div class="col-md-6"><label class="form-label" for="assignDue">截止日期</label><input id="assignDue" type="datetime-local" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label" for="assignPoints">作业满分</label><input id="assignPoints" type="number" class="form-control" value="100"></div>
+          <div class="col-12"><label class="form-label" for="assignDesc">作业要求</label><textarea id="assignDesc" class="form-control" rows="3" placeholder="请输入作业要求和提交内容说明"></textarea></div>
+          <div class="col-12"><label class="form-label" for="assignDetail">作业详情</label><textarea id="assignDetail" class="form-control" rows="5" placeholder="请输入详细背景、步骤、评分标准、提交格式等内容，供学生查看和 RAG 索引使用"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="publishAssignment()">发布</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="peerConfigModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">互评配置</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="peerConfigAssignmentId">
+        <div class="mb-3 fw-semibold" id="peerConfigTitle"></div>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="peerEnabled">
+          <label class="form-check-label" for="peerEnabled">开启匿名互评</label>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="peerOpenAt">开放时间</label><input id="peerOpenAt" type="datetime-local" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label" for="peerCloseAt">截止时间</label><input id="peerCloseAt" type="datetime-local" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label" for="peerRequiredCount">每人互评次数</label><input id="peerRequiredCount" type="number" class="form-control" value="1" min="1"></div>
+          <div class="col-md-4"><label class="form-label" for="peerBonusPerReview">每次加分</label><input id="peerBonusPerReview" type="number" class="form-control" value="1" min="0" step="0.5"></div>
+          <div class="col-md-4"><label class="form-label" for="peerBonusCap">加分上限</label><input id="peerBonusCap" type="number" class="form-control" value="1" min="0" step="0.5"></div>
+          <div class="col-12"><label class="form-label" for="peerPrompt">互评提示</label><textarea id="peerPrompt" class="form-control" rows="4" placeholder="告诉学生应从哪些方面进行匿名评价"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="savePeerConfig()">保存配置</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="gradeModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">批改作业</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="gradeSubmissionId">
+        <input type="hidden" id="gradeQuickCommentId">
+        <input type="hidden" id="gradeAiSuggestionId">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="gradeScore">分数</label>
+            <input id="gradeScore" type="number" class="form-control" min="0" max="100" step="0.5" placeholder="0-100">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label" for="gradeStudentName">学生</label>
+            <input id="gradeStudentName" class="form-control" disabled>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="gradeComment">评语</label>
+            <textarea id="gradeComment" class="form-control" rows="4" placeholder="请输入批改评语"></textarea>
+          </div>
+          <div class="col-12">
+            <div class="section-surface">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <div class="fw-semibold">AI 批改建议</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-outline-primary btn-sm" type="button" onclick="requestAiGradeSuggestion()"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>生成建议</button>
+                  <button class="btn btn-outline-success btn-sm" type="button" onclick="approveAiGradeSuggestion()"><i class="fa-solid fa-check me-1"></i>采用</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" onclick="modifyAiGradeSuggestion()"><i class="fa-solid fa-pen-to-square me-1"></i>按当前内容保存</button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" onclick="regenerateAiGradeSuggestion()"><i class="fa-solid fa-rotate me-1"></i>重新生成</button>
+                </div>
+              </div>
+              <div id="aiGradeSuggestionBox" class="small text-muted">生成后会自动填充分数和评语，教师仍可修改确认。</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div class="fw-semibold">快捷评语</div>
+              <div class="btn-group btn-group-sm" role="group">
+                <button class="btn btn-outline-primary active" type="button" data-category="all" onclick="loadQuickComments('all')">全部</button>
+                <button class="btn btn-outline-primary" type="button" data-category="ENCOURAGEMENT" onclick="loadQuickComments('ENCOURAGEMENT')">鼓励</button>
+                <button class="btn btn-outline-primary" type="button" data-category="CORRECTION" onclick="loadQuickComments('CORRECTION')">纠错</button>
+                <button class="btn btn-outline-primary" type="button" data-category="SCORE_IMPROVEMENT" onclick="loadQuickComments('SCORE_IMPROVEMENT')">提分</button>
+              </div>
+            </div>
+            <div id="quickCommentBox" class="d-flex flex-wrap gap-2"></div>
+            <div class="form-text">常用评语会自动记忆，并按你的使用频率排序。</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-primary" onclick="submitGrade()">提交评分</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js?v=20260730"></script>
+<script>
+window.TOKEN = new URLSearchParams(location.search).get("token") || localStorage.getItem("token") || "";
+if (!TOKEN) location.href = "/";
+App.initTheme();
+App.initNotifications(TOKEN);
+App.setBreadcrumb(["教师工作台", "概览"]);
+var displayName = localStorage.getItem("displayName") || "教师";
+document.getElementById("userName").textContent = displayName;
+document.getElementById("heroName").textContent = displayName;
+
+var tabs = Array.from(document.querySelectorAll(".nav-item"));
+var teacherCourses = [];
+var teacherAssignments = [];
+var gradingSubmissionMeta = {};
+var currentGradeRow = null;
+var teacherActivityPage = 1;
+var teacherActivityPageSize = 3;
+var quickCommentCategory = 'all';
+var analysisChartIds = [];
+var teacherAiMode = localStorage.getItem("teacherAiMode") || "course_material";
+var teacherAiMessages = readTeacherAiMessages();
+var teacherAiModeLabels = {
+  course_material: "课程资料",
+  assignment_submission: "作业提交",
+  teaching_advice: "教学建议",
+  other: "其他问题"
+};
+function readTeacherAiMessages() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("teacherAiMessages") || "[]");
+    return Array.isArray(saved) ? saved.slice(-30) : [];
+  } catch (err) {
+    return [];
+  }
+}
+function saveTeacherAiMessages() {
+  localStorage.setItem("teacherAiMessages", JSON.stringify(teacherAiMessages.slice(-30)));
+}
+function setTeacherAiMode(mode) {
+  teacherAiMode = teacherAiModeLabels[mode] ? mode : "other";
+  localStorage.setItem("teacherAiMode", teacherAiMode);
+  document.querySelectorAll("#teacherAiModes .ai-mode-button").forEach(function(button) {
+    button.classList.toggle("active", button.dataset.mode === teacherAiMode);
+  });
+}
+function renderTeacherAiCitations(citations) {
+  if (!citations || !citations.length) return "";
+  return '<div class="ai-chat-citations"><div class="fw-semibold mb-1">课程资料引用</div>' +
+    citations.map(function(c) {
+      return '<div>' + App.escapeHtml(c.source || "课程资料") + ' · chunk ' +
+        (c.chunkIndex != null ? c.chunkIndex : c.chunk_index || 0) + ' · 相似度 ' +
+        Number(c.similarity || c.score || 0).toFixed(2) + '</div>';
+    }).join("") + '</div>';
+}
+function renderTeacherAiChat() {
+  var history = document.getElementById("teacherAiChatHistory");
+  if (!history) return;
+  if (!teacherAiMessages.length) {
+    history.innerHTML = '<div class="text-muted small">选择问题分类后开始对话。助手会结合课程资料和教学数据持续理解当前上下文。</div>';
+    return;
+  }
+  history.innerHTML = teacherAiMessages.map(function(item) {
+    var roleLabel = item.role === "user" ? "我" : "助手";
+    return '<div class="ai-chat-message ' + (item.role === "user" ? "user" : "assistant") + '">' +
+      '<div class="ai-chat-meta">' + roleLabel + (item.mode ? ' · ' + App.escapeHtml(teacherAiModeLabels[item.mode] || item.mode) : '') + '</div>' +
+      '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderTeacherAiCitations(item.citations) + '</div></div>';
+  }).join("");
+  history.scrollTop = history.scrollHeight;
+}
+function hasEcharts() {
+  return typeof window.echarts !== "undefined";
+}
+function scheduleVisibleChartResize(ids) {
+  requestAnimationFrame(function() {
+    (ids || []).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el || !hasEcharts()) return;
+      var chart = echarts.getInstanceByDom(el);
+      if (chart && chart.resize) chart.resize();
+    });
+  });
+}
+function parseApiErrorPayload(payload, fallback) {
+  if (!payload) return fallback;
+  if (typeof payload === "string") return payload;
+  return payload.message || payload.error || fallback;
+}
+tabs.forEach(function(el) { el.addEventListener("click", function() { switchTab(el.dataset.tab); }); });
+function switchTab(tab) {
+  tabs.forEach(function(x) { x.classList.toggle("active", x.dataset.tab === tab); });
+  document.querySelectorAll(".view").forEach(function(v) { v.classList.add("d-none"); });
+  document.getElementById("view-" + tab).classList.remove("d-none");
+  var title = {dashboard:"概览", courses:"课程管理", students:"学生管理", assignments:"作业管理", "peer-review":"互评管理", grading:"评分", analysis:"分析", "ai-agent":"AI Agent"}[tab];
+  document.getElementById("titleText").textContent = title;
+  App.setBreadcrumb(["教师工作台", title]);
+  if (tab === "dashboard") {
+    loadDashboard();
+  }
+  if (tab === "courses") loadCourses();
+  if (tab === "students") loadStudents();
+  if (tab === "assignments") loadAssignments();
+  if (tab === "peer-review") loadPeerReviewManage();
+  if (tab === "grading") loadGrading();
+  if (tab === "analysis") loadAnalysis();
+  if (tab === "ai-agent") loadTeacherAiAgent();
+}
+
+async function api(url, method, body) {
+  return App.request(url, method, body);
+}
+
+async function openProfileModal() {
+  try {
+    var profile = await api("/profile");
+    profileUsername.value = profile.username || "";
+    profileDisplayName.value = profile.displayName || "";
+    profileEmail.value = profile.email || "";
+    profilePassword.value = "";
+    new bootstrap.Modal(profileModal).show();
+  } catch (err) {
+    alert(err.message || "加载个人资料失败");
+  }
+}
+
+async function saveProfile() {
+  try {
+    var payload = {
+      display_name: profileDisplayName.value.trim(),
+      email: profileEmail.value.trim(),
+      new_password: profilePassword.value.trim()
+    };
+    if (!payload.new_password) delete payload.new_password;
+    var profile = await api("/profile", "PUT", payload);
+    var name = profile.displayName || profile.username || "教师";
+    localStorage.setItem("displayName", name);
+    document.getElementById("userName").textContent = name;
+    document.getElementById("heroName").textContent = name;
+    bootstrap.Modal.getInstance(profileModal).hide();
+    alert("个人资料已更新");
+  } catch (err) {
+    alert(err.message || "保存失败");
+  }
+}
+
+function handleKpiKey(event, tab) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    switchTab(tab);
+  }
+}
+
+function renderEmptyPanel(title, desc, compact, actionLabel, actionHandler, icon) {
+  var action = actionLabel && actionHandler
+    ? '<div class="empty-panel-actions"><button class="btn btn-primary btn-sm" type="button" onclick="' + actionHandler + '"><i class="fa-solid ' + (icon || 'fa-arrow-right') + ' me-1"></i>' + App.escapeHtml(actionLabel) + '</button></div>'
+    : '';
+  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div>' + action + '</div></div>';
+}
+
+function dashboardField(data, camelKey, snakeKey, fallback) {
+  if (!data) return fallback;
+  if (data[camelKey] != null) return data[camelKey];
+  if (snakeKey && data[snakeKey] != null) return data[snakeKey];
+  return fallback;
+}
+
+function dashboardList(data, camelKey, snakeKey) {
+  var value = dashboardField(data, camelKey, snakeKey, []);
+  return Array.isArray(value) ? value : [];
+}
+
+function percentValue(done, total) {
+  if (!total) return 0;
+  return Math.max(0, Math.min(100, Math.round(done / total * 100)));
+}
+
+function humanFileLabel(filePaths) {
+  if (!filePaths) return '无附件';
+  return filePaths.split(',').map(function(item) {
+    var value = String(item || '').trim();
+    if (!value) return null;
+    var parts = value.split('::');
+    return parts[1] || '已上传附件';
+  }).filter(Boolean).join('、') || '无附件';
+}
+
+function previewStoredFile(path) {
+  return App.previewFile(path);
+}
+
+function downloadStoredFile(path, name) {
+  var fileId = App.getStoredFileId(path);
+  if (!fileId) return Promise.reject(new Error('File identifier is invalid'));
+  return App.downloadFile('/files/' + encodeURIComponent(fileId) + '/download', name || '附件');
+}
+
+function renderActivityPager(total, page, action) {
+  var pages = Math.max(1, Math.ceil(total / teacherActivityPageSize));
+  if (pages <= 1) return '';
+  var html = '<div class="activity-pager"><button class="btn btn-outline-secondary btn-sm" onclick="' + action + '(' + Math.max(1, page - 1) + ')" ' + (page <= 1 ? 'disabled' : '') + '>上一页</button>';
+  for (var i = 1; i <= pages; i++) {
+    html += '<button class="btn ' + (i === page ? 'btn-primary' : 'btn-outline-secondary') + ' btn-sm" onclick="' + action + '(' + i + ')">' + i + '</button>';
+  }
+  html += '<button class="btn btn-outline-secondary btn-sm" onclick="' + action + '(' + Math.min(pages, page + 1) + ')" ' + (page >= pages ? 'disabled' : '') + '>下一页</button></div>';
+  return html;
+}
+
+function goTeacherActivityPage(page) {
+  teacherActivityPage = page;
+  loadDashboard();
+}
+
+async function loadDashboard() {
+  try {
+    var dashboard = await api('/teacher/dashboard');
+    var courses = dashboardList(dashboard, "courseTrend", "course_trend");
+    var activities = dashboardList(dashboard, "recentActivities", "recent_activities");
+    var totalCourses = Number(dashboardField(dashboard, "totalCourses", "total_courses", 0) || 0);
+    var totalStudents = Number(dashboardField(dashboard, "totalStudents", "total_students", 0) || 0);
+    var peerEnabled = Number(dashboardField(dashboard, "peerEnabledCount", "peer_enabled_count", 0) || 0);
+    var activeCourses = Number(dashboardField(dashboard, "activeCourses", "active_courses", 0) || 0);
+    document.getElementById("kpiGrid").innerHTML = [
+      { label: "负责课程", value: totalCourses, color: "var(--accent)", tab: "courses" },
+      { label: "学生总数", value: totalStudents, color: "var(--accent-2)", tab: "students" },
+      { label: "已开互评", value: peerEnabled, color: "var(--accent-3)", tab: "peer-review" },
+      { label: "有学生课程", value: activeCourses, color: "var(--accent-4)", tab: "analysis" }
+    ].map(function(k) { return '<div class="kpi" role="button" tabindex="0" onclick="switchTab(\'' + k.tab + '\')" onkeydown="handleKpiKey(event, \'' + k.tab + '\')" style="border-left:4px solid ' + k.color + '"><div class="value">' + k.value + '</div><div class="label">' + k.label + '</div></div>'; }).join("");
+
+    renderTeacherGlobalPanel({
+      courses: courses,
+      totalCourses: totalCourses,
+      totalStudents: totalStudents,
+      peerEnabled: peerEnabled,
+      activeCourses: activeCourses
+    });
+
+    var activityPages = Math.max(1, Math.ceil(activities.length / teacherActivityPageSize));
+    if (teacherActivityPage > activityPages) teacherActivityPage = activityPages;
+    var activityStart = (teacherActivityPage - 1) * teacherActivityPageSize;
+    var pageActivities = activities.slice(activityStart, activityStart + teacherActivityPageSize);
+    document.getElementById("recentActivityList").innerHTML = activities.length
+      ? '<div class="activity-page-list">' + pageActivities.map(function(item) {
+          return '<div class="activity-item"><div class="activity-title">' + App.escapeHtml(item.title || '平台活动') + '</div><div class="activity-content">' + App.escapeHtml(item.content || '暂无活动内容') + '</div><div class="activity-meta">' + App.timeAgo(item.publishedAt || item.createdAt) + '</div></div>';
+        }).join('') + '</div>' + renderActivityPager(activities.length, teacherActivityPage, 'goTeacherActivityPage')
+      : renderEmptyPanel('暂无近期活动', '管理员发布活动后，会在这里展示最近动态。', true);
+
+  } catch (err) {
+    document.getElementById("kpiGrid").innerHTML = renderEmptyPanel('概览加载失败', err.message || '暂时无法加载教师概览数据。', false);
+    document.getElementById("recentActivityList").innerHTML = renderEmptyPanel('暂无近期活动', '教师首页加载失败，请稍后重试。', true);
+    document.getElementById("teacherGlobalPanel").innerHTML = renderEmptyPanel('暂无教学盘点', '当前教学全局盘点暂时无法渲染，请稍后刷新重试。', false);
+    console.error(err);
+  }
+}
+
+function renderTeacherGlobalPanel(summary) {
+  var activeRate = percentValue(summary.activeCourses, summary.totalCourses);
+  var peerRate = percentValue(summary.peerEnabled, summary.totalCourses);
+  var avgStudents = summary.totalCourses ? (summary.totalStudents / summary.totalCourses).toFixed(1) : "0.0";
+  var sortedCourses = summary.courses.slice().sort(function(a, b) {
+    return Number(b.value || 0) - Number(a.value || 0);
+  });
+  var topCourse = sortedCourses[0] || null;
+  var topCourseValue = topCourse ? Number(topCourse.value || 0) : 0;
+  var maxStudents = Math.max(topCourseValue, 1);
+  var next = summary.totalCourses === 0
+    ? { title: "先创建第一门课程", desc: "有课程后才能承接学生、作业和成绩分析。", tab: "courses", icon: "fa-book-medical" }
+    : summary.peerEnabled < summary.totalCourses
+      ? { title: "检查互评覆盖", desc: "还有课程或作业未开启互评，可以按教学目标补齐。", tab: "peer-review", icon: "fa-comments" }
+      : { title: "查看课程分析", desc: "课程和互评已铺开，适合进入分析页看成绩分布。", tab: "analysis", icon: "fa-chart-column" };
+
+  var cards = [
+    { label: "课程活跃率", value: activeRate + "%", desc: summary.activeCourses + " / " + summary.totalCourses + " 门已有学生", progress: activeRate, color: "var(--accent)" },
+    { label: "互评覆盖", value: peerRate + "%", desc: summary.peerEnabled + " 门作业已开互评", progress: peerRate, color: "var(--accent-3)" },
+    { label: "平均班级规模", value: avgStudents, desc: "学生总数 " + summary.totalStudents, progress: percentValue(Number(avgStudents), 50), color: "var(--accent-2)" },
+    { label: "当前最大课堂", value: topCourseValue, desc: topCourse ? topCourse.name : "暂无课程数据", progress: percentValue(topCourseValue, maxStudents), color: "var(--accent-4)" }
+  ];
+
+  document.getElementById("teacherGlobalPanel").innerHTML =
+    '<div class="global-overview-grid">' + cards.map(function(item) {
+      return '<div class="global-overview-item">' +
+        '<div class="global-overview-head"><div><div class="global-overview-label">' + App.escapeHtml(item.label) + '</div><div class="small text-muted">' + App.escapeHtml(item.desc) + '</div></div><div class="global-overview-value">' + App.escapeHtml(item.value) + '</div></div>' +
+        '<div class="global-overview-progress"><span style="width:' + item.progress + '%;background:' + item.color + '"></span></div>' +
+      '</div>';
+    }).join('') + '</div>' +
+    '<button class="global-next-action text-start" type="button" onclick="switchTab(\'' + next.tab + '\')">' +
+      '<span><span class="fw-semibold d-block"><i class="fa-solid ' + next.icon + ' me-2" style="color:var(--accent)"></i>' + App.escapeHtml(next.title) + '</span><span class="small text-muted">' + App.escapeHtml(next.desc) + '</span></span>' +
+      '<i class="fa-solid fa-chevron-right text-muted"></i>' +
+    '</button>';
+}
+
+async function loadCourses() {
+  var courses = await api("/teacher/courses");
+  teacherCourses = courses;
+  var html = '<div class="section-head"><h5 class="mb-0">课程管理</h5><button class="btn btn-primary btn-sm" onclick="openCourseModal()">新建课程</button></div>';
+  if (!courses.length) {
+    document.getElementById("courseBox").innerHTML = html + renderEmptyPanel('暂无课程', '先创建课程，再安排学生和作业内容。', false, '新建课程', 'openCourseModal()', 'fa-book-medical');
+    syncAssignmentCourseOptions();
+    return;
+  }
+  html += '<div class="table-wrap"><table class="table table-hover align-middle teacher-course-table"><thead><tr><th>课程</th><th>描述</th><th>时间</th><th>学分</th><th>学生数</th><th>操作</th></tr></thead><tbody>';
+  courses.forEach(function(c) {
+    html += '<tr><td><span class="fw-semibold">' + App.escapeHtml(c.name || '未命名课程') + '</span></td><td>' + App.escapeHtml(c.description || '暂无课程描述') + '</td><td>' + App.escapeHtml(c.schedule || '时间待定') + '</td><td>' + (c.credits != null ? c.credits : '未设置') + '</td><td>' + (c.enrolledCount || 0) + '/' + (c.maxStudents || 50) + '</td><td><button class="btn btn-outline-primary btn-sm me-1" onclick="openCourseModal(' + c.id + ')"><i class="fa-solid fa-pen"></i> 编辑</button><button class="btn btn-outline-danger btn-sm" onclick="deleteCourse(' + c.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
+  });
+  html += '</tbody></table></div>';
+  document.getElementById("courseBox").innerHTML = html;
+  syncAssignmentCourseOptions();
+}
+
+function syncAssignmentCourseOptions() {
+  var sel = document.getElementById("assignCourse");
+  if (!teacherCourses.length) {
+    sel.innerHTML = '<option value="">暂无课程可选</option>';
+    return;
+  }
+  sel.innerHTML = teacherCourses.map(function(c) { return '<option value="' + c.id + '">' + App.escapeHtml(c.name || '未命名课程') + '</option>'; }).join('');
+}
+
+function openCourseModal(id) {
+  var course = teacherCourses.find(function(c) { return c.id === id; });
+  courseId.value = course ? course.id : "";
+  courseName.value = course ? (course.name || "") : "";
+  courseDesc.value = course ? (course.description || "") : "";
+  courseSchedule.value = course ? (course.schedule || "") : "";
+  courseMax.value = course ? (course.maxStudents || 50) : 50;
+  courseCredits.value = course ? (course.credits || 3) : 3;
+  courseModalTitle.textContent = course ? "编辑课程" : "新建课程";
+  new bootstrap.Modal(courseModal).show();
+}
+
+async function saveCourse() {
+  var payload = {
+    name: courseName.value.trim(),
+    description: courseDesc.value.trim(),
+    schedule: courseSchedule.value.trim(),
+    max_students: Number(courseMax.value || 50),
+    credits: Number(courseCredits.value || 3)
+  };
+  if (courseId.value) {
+    await api("/teacher/courses/" + courseId.value, "PUT", payload);
+  } else {
+    await api("/teacher/courses", "POST", payload);
+  }
+  bootstrap.Modal.getInstance(courseModal).hide();
+  loadCourses();
+  loadDashboard();
+}
+
+async function deleteCourse(id) {
+  await api("/teacher/courses/" + id, "DELETE");
+  loadCourses();
+  loadDashboard();
+}
+
+async function loadStudents() {
+  var courses = await api("/teacher/courses");
+  var html = '<div class="section-head"><h5 class="mb-0">学生管理</h5><span class="metric-muted">按课程查看选课学生</span></div>';
+  var hasStudents = false;
+  for (var ci = 0; ci < courses.length; ci++) {
+    var c = courses[ci];
+    var students = await api("/teacher/courses/" + c.id + "/students");
+    if (!students.length) {
+      html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6>' + renderEmptyPanel('暂无选课学生', '该课程目前还没有学生加入。可让学生端先完成选课，或联系管理员调整选课名单。', true, '查看课程', "switchTab('courses')", 'fa-book') + '</div>';
+      continue;
+    }
+    hasStudents = true;
+    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6><table class="table table-sm table-hover align-middle teacher-student-table"><thead><tr><th>学生姓名</th><th>用户名</th><th>邮箱</th></tr></thead><tbody>';
+    students.forEach(function(s) {
+      html += '<tr><td>' + App.escapeHtml(s.displayName || '未填写姓名') + '</td><td>' + App.escapeHtml(s.username || '-') + '</td><td>' + App.escapeHtml(s.email || '未填写邮箱') + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  document.getElementById("studentBox").innerHTML = courses.length ? html : renderEmptyPanel('暂无课程数据', '创建课程后可在这里查看学生名单。', false, '新建课程', 'openCourseModal()', 'fa-book-medical');
+}
+
+async function loadAssignments() {
+  var courses = await api("/teacher/courses");
+  teacherCourses = courses;
+  syncAssignmentCourseOptions();
+  teacherAssignments = [];
+  var html = '<div class="section-head"><h5 class="mb-0">作业管理</h5><button class="btn btn-primary btn-sm" onclick="openAssignmentModal()">发布作业</button></div>';
+  var hasData = false;
+  for (var ci = 0; ci < courses.length; ci++) {
+    var c = courses[ci];
+    var list = await api("/teacher/courses/" + c.id + "/assignments");
+    list.forEach(function(a) { teacherAssignments.push(a); });
+    if (!list.length) {
+      html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6>' + renderEmptyPanel('暂无作业', '这门课程还没有发布作业，可直接从上方创建。', true, '发布作业', 'openAssignmentModal()', 'fa-file-circle-plus') + '</div>';
+      continue;
+    }
+    hasData = true;
+    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6><table class="table table-sm align-middle teacher-assignment-table"><thead><tr><th>标题</th><th>截止</th><th>满分</th><th>状态</th><th>互评</th><th>提交数</th><th>操作</th></tr></thead><tbody>';
+    list.forEach(function(a) {
+      var peerStatus = a.peerReviewEnabled ? '<span class="badge-soft bg-info bg-opacity-10 text-info">已开启</span>' : '<span class="badge-soft bg-secondary bg-opacity-10 text-secondary">未开启</span>';
+      var workStatus = a.status === 'CLOSED' ? '<span class="badge-soft bg-warning bg-opacity-10 text-warning">已截止</span>' : '<span class="badge-soft bg-success bg-opacity-10 text-success">已发布</span>';
+      html += '<tr><td>' + App.escapeHtml(a.title || '未命名作业') + '</td><td>' + (App.fmtTime(a.dueDate) || '无截止时间') + '</td><td>' + (a.totalPoints || 100) + '</td><td>' + workStatus + '</td><td>' + peerStatus + '</td><td>' + (a.submissionCount || 0) + '</td><td><button class="btn btn-outline-primary btn-sm me-1" onclick="openAssignmentModal(' + a.id + ')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteAssignment(' + a.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  document.getElementById("assignmentBox").innerHTML = courses.length ? html : renderEmptyPanel('暂无课程可发布作业', '请先创建课程，再为课程发布作业。', false, '新建课程', 'openCourseModal()', 'fa-book-medical');
+}
+
+function openAssignmentModal(id) {
+  if (!teacherCourses.length) {
+    App.showToast('请先创建课程，再发布作业', 'warning');
+    return;
+  }
+  var assignment = teacherAssignments.find(function(a) { return a.id === id; });
+  assignId.value = assignment ? assignment.id : "";
+  assignModalTitle.textContent = assignment ? "编辑作业" : "发布作业";
+  assignTitle.value = assignment ? (assignment.title || "") : "";
+  assignCourse.value = assignment ? assignment.courseId : (assignCourse.value || "");
+  assignCourse.disabled = !!assignment;
+  assignDue.value = assignment && assignment.dueDate ? String(assignment.dueDate).slice(0, 16) : "";
+  assignPoints.value = assignment ? (assignment.totalPoints || 100) : 100;
+  assignDesc.value = assignment ? (assignment.description || "") : "";
+  assignDetail.value = assignment ? (assignment.detail || "") : "";
+  new bootstrap.Modal(assignModal).show();
+}
+
+async function publishAssignment() {
+  try {
+    var payload = {
+      title: assignTitle.value.trim(),
+      description: assignDesc.value.trim(),
+      detail: assignDetail.value.trim(),
+      due_date: assignDue.value,
+      total_points: Number(assignPoints.value || 100),
+      course_id: Number(assignCourse.value)
+    };
+    if (assignId.value) {
+      delete payload.course_id;
+      await api("/teacher/assignments/" + assignId.value, "PUT", payload);
+    } else {
+      await api("/teacher/assignments", "POST", payload);
+    }
+    assignCourse.disabled = false;
+    bootstrap.Modal.getInstance(assignModal).hide();
+    loadAssignments();
+    loadPeerReviewManage();
+    loadDashboard();
+    App.showToast(assignId.value ? '作业已更新' : '作业已发布');
+  } catch (err) {
+    assignCourse.disabled = !!assignId.value;
+    App.showToast(err.message || '作业保存失败', 'danger');
+  }
+}
+
+async function deleteAssignment(id) {
+  if (!confirm('确认删除该作业？已有提交的作业不能删除。')) return;
+  try {
+    await api('/teacher/assignments/' + id, 'DELETE');
+    loadAssignments();
+    loadPeerReviewManage();
+    loadGrading();
+    loadAnalysis();
+  } catch (err) {
+    App.showToast(err.message || '删除失败', 'danger');
+  }
+}
+
+async function loadPeerReviewManage() {
+  var courses = await api("/teacher/courses");
+  var html = '<div class="section-head"><h5 class="mb-0">互评管理</h5></div>';
+  var hasData = false;
+  for (var ci = 0; ci < courses.length; ci++) {
+    var c = courses[ci];
+    var assignments = await api("/teacher/courses/" + c.id + "/assignments");
+    if (!assignments.length) continue;
+    hasData = true;
+    html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name) + '</h6><table class="table table-sm align-middle teacher-peer-table"><thead><tr><th>作业</th><th>状态</th><th>窗口</th><th>规则</th><th>参与统计</th><th></th></tr></thead><tbody>';
+    for (var ai = 0; ai < assignments.length; ai++) {
+      var a = assignments[ai];
+      var overview = await api('/teacher/assignments/' + a.id + '/peer-review');
+      var status = overview.enabled ? '<span class="badge-soft bg-success bg-opacity-10 text-success">已开启</span>' : '<span class="badge-soft bg-secondary bg-opacity-10 text-secondary">未开启</span>';
+      html += '<tr><td>' + App.escapeHtml(a.title) + '</td><td>' + status + '</td><td>' + (overview.openAt ? App.fmtTime(overview.openAt) : '-') + ' ~ ' + (overview.closeAt ? App.fmtTime(overview.closeAt) : '-') + '</td><td>' + (overview.requiredCount || 1) + ' 次 / 每次 ' + Number(overview.bonusPerReview || 0).toFixed(1) + ' 分 / 上限 ' + Number(overview.bonusCap || 0).toFixed(1) + ' 分</td><td>已提交 ' + (overview.totalReviews || 0) + ' 次，已加分 ' + (overview.grantedCount || 0) + ' 次</td><td><button class="btn btn-outline-primary btn-sm" onclick="openPeerConfig(' + a.id + ', ' + JSON.stringify(App.escapeAttr(a.title || '')).replace(/"/g, '&quot;') + ')"><i class="fa-solid fa-sliders me-1"></i>配置</button></td></tr>';
+    }
+    html += '</tbody></table></div>';
+  }
+  document.getElementById('peerReviewManageBox').innerHTML = hasData ? html : renderEmptyPanel('暂无互评配置', '请先发布作业，再配置匿名互评规则。', false, '发布作业', 'openAssignmentModal()', 'fa-file-circle-plus');
+}
+
+async function openPeerConfig(assignmentId, title) {
+  var overview = await api('/teacher/assignments/' + assignmentId + '/peer-review');
+  peerConfigAssignmentId.value = assignmentId;
+  peerConfigTitle.textContent = String(title || '').replace(/&quot;/g, '');
+  peerEnabled.checked = !!overview.enabled;
+  peerOpenAt.value = overview.openAt ? String(overview.openAt).slice(0, 16) : '';
+  peerCloseAt.value = overview.closeAt ? String(overview.closeAt).slice(0, 16) : '';
+  peerRequiredCount.value = overview.requiredCount || 1;
+  peerBonusPerReview.value = overview.bonusPerReview != null ? overview.bonusPerReview : 1;
+  peerBonusCap.value = overview.bonusCap != null ? overview.bonusCap : 1;
+  peerPrompt.value = overview.prompt || '';
+  new bootstrap.Modal(peerConfigModal).show();
+}
+
+async function savePeerConfig() {
+  var assignmentId = peerConfigAssignmentId.value;
+  await api('/teacher/assignments/' + assignmentId + '/peer-review', 'POST', {
+    peer_review_enabled: peerEnabled.checked,
+    peer_review_open_at: peerOpenAt.value || null,
+    peer_review_close_at: peerCloseAt.value || null,
+    peer_review_required_count: Number(peerRequiredCount.value || 1),
+    peer_review_bonus_per_review: Number(peerBonusPerReview.value || 1),
+    peer_review_bonus_cap: Number(peerBonusCap.value || 1),
+    peer_review_prompt: peerPrompt.value.trim()
+  });
+  bootstrap.Modal.getInstance(peerConfigModal).hide();
+  loadAssignments();
+  loadPeerReviewManage();
+  loadDashboard();
+}
+
+async function loadGrading() {
+  var courses = await api("/teacher/courses");
+  gradingSubmissionMeta = {};
+  var html = '<div class="section-head"><h5 class="mb-0">评分任务</h5><span class="metric-muted">集中查看学生提交与附件</span></div>';
+  var hasGrading = false;
+  for (var ci = 0; ci < courses.length; ci++) {
+    var c = courses[ci];
+    var assignments = await api("/teacher/courses/" + c.id + "/assignments");
+    for (var ai = 0; ai < assignments.length; ai++) {
+      var a = assignments[ai];
+      var subs = await api("/teacher/assignments/" + a.id + "/submissions");
+      if (!subs.length) continue;
+      hasGrading = true;
+      html += '<div class="table-wrap mb-3"><h6 class="mb-2"><i class="fa-solid fa-file me-2" style="color:var(--accent-2)"></i>' + App.escapeHtml(c.name || '未命名课程') + ' / ' + App.escapeHtml(a.title || '未命名作业') + '</h6><table class="table table-sm align-middle teacher-grading-table"><thead><tr><th>学生</th><th>提交内容</th><th>状态</th><th>分数</th><th></th></tr></thead><tbody>';
+      subs.forEach(function(s) {
+        var submittedContent = s.content ? App.escapeHtml(s.content) : '仅附件提交';
+        var attachments = App.parseStoredFiles(s.filePaths);
+        if (attachments.length) {
+          submittedContent += '<div class="small text-muted mt-1 d-flex flex-column gap-1">' + attachments.map(function(file) {
+            var safeName = App.escapeHtml(file.name || '附件');
+            var safePathAttr = App.escapeAttr(file.path || '');
+            var safeNameAttr = App.escapeAttr(file.name || '附件');
+            return '<div><i class="fa-solid fa-paperclip me-1"></i>' + safeName + ' <a href="javascript:;" data-path="' + safePathAttr + '" onclick="previewStoredFile(this.dataset.path)" class="text-decoration-none ms-1">预览</a> <a href="javascript:;" data-path="' + safePathAttr + '" data-name="' + safeNameAttr + '" onclick="downloadStoredFile(this.dataset.path, this.dataset.name)" class="text-decoration-none ms-1">下载</a></div>';
+          }).join('') + '</div>';
+        }
+        var studentName = s.studentName || '-';
+        gradingSubmissionMeta[s.id] = {
+          studentName: studentName,
+          teacherComment: s.teacherComment || '',
+          score: s.score
+        };
+        html += '<tr><td>' + App.escapeHtml(studentName) + '</td><td>' + submittedContent + '</td><td>' + (s.status === 'SUBMITTED' ? '<span class="badge-soft bg-warning bg-opacity-10 text-warning">待评分</span>' : s.status === 'GRADED' ? '<span class="badge-soft bg-success bg-opacity-10 text-success">已评分</span>' : App.escapeHtml(s.status || '待处理')) + '</td><td><span class="fw-semibold">' + (s.score != null ? s.score : '-') + '</span></td><td><button class="btn btn-outline-primary btn-sm me-1" onclick="openGradeModal(' + s.id + ')"><i class="fa-solid fa-pen"></i> 评分</button><button class="btn btn-outline-secondary btn-sm" onclick="openGradeModal(' + s.id + ', true)"><i class="fa-solid fa-wand-magic-sparkles"></i> AI</button></td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+  }
+  document.getElementById("gradingBox").innerHTML = hasGrading ? html : renderEmptyPanel('暂无待评分作业', '学生提交后，会在这里集中展示评分任务。', false, '查看作业', "switchTab('assignments')", 'fa-file-lines');
+}
+
+async function loadQuickComments(category) {
+  if (category !== undefined) {
+    quickCommentCategory = category && category !== 'all' ? category : 'all';
+  }
+  document.querySelectorAll('#gradeModal .btn-group .btn').forEach(function(btn) {
+    var btnCategory = btn.dataset.category || 'all';
+    btn.classList.toggle('active', btnCategory === quickCommentCategory);
+  });
+  var query = quickCommentCategory !== 'all' ? ('?category=' + encodeURIComponent(quickCommentCategory)) : '';
+  var list = await api('/teacher/comment-memories' + query);
+  var box = document.getElementById('quickCommentBox');
+  if (!list.length) {
+    box.innerHTML = '<div class="text-muted small">暂无快捷评语，提交批改后会自动记忆常用评语。</div>';
+    return;
+  }
+  box.innerHTML = list.map(function(item) {
+    gradingSubmissionMeta['comment:' + item.id] = item.commentText || '';
+    return '<button type="button" class="btn btn-outline-primary btn-sm text-start" onclick="applyQuickComment(' + item.id + ')">' +
+      '<span class="d-block fw-semibold">' + App.escapeHtml(mapCommentCategory(item.category)) + '</span>' +
+      '<span class="d-block small text-muted">使用 ' + (item.usageCount || 0) + ' 次</span>' +
+      '<span class="d-block mt-1">' + App.escapeHtml(item.commentText || '') + '</span>' +
+      '</button>';
+  }).join('');
+}
+
+function mapCommentCategory(category) {
+  return {
+    ENCOURAGEMENT: '鼓励',
+    CORRECTION: '纠错',
+    SCORE_IMPROVEMENT: '提分'
+  }[category] || '快捷评语';
+}
+
+function applyQuickComment(id) {
+  gradeQuickCommentId.value = id;
+  gradeComment.value = gradingSubmissionMeta['comment:' + id] || '';
+}
+
+async function openGradeModal(id, autoAi) {
+  var meta = gradingSubmissionMeta[id] || {};
+  gradeSubmissionId.value = id;
+  gradeStudentName.value = meta.studentName || '';
+  gradeComment.value = meta.teacherComment || '';
+  gradeScore.value = meta.score == null ? '' : meta.score;
+  gradeQuickCommentId.value = '';
+  gradeAiSuggestionId.value = '';
+  aiGradeSuggestionBox.innerHTML = '生成后会自动填充分数和评语，教师仍可修改确认。';
+  quickCommentCategory = 'all';
+  await loadQuickComments('all');
+  currentGradeRow = new bootstrap.Modal(gradeModal);
+  currentGradeRow.show();
+  if (autoAi) requestAiGradeSuggestion();
+}
+
+async function submitGrade() {
+  var id = Number(gradeSubmissionId.value);
+  var num = Number(gradeScore.value);
+  if (isNaN(num) || num < 0 || num > 100) {
+    alert('分数必须在0-100之间');
+    return;
+  }
+  var payload = {
+    score: num,
+    comment: gradeComment.value.trim(),
+    quickCommentId: gradeQuickCommentId.value ? Number(gradeQuickCommentId.value) : null
+  };
+  await api('/teacher/submissions/' + id + '/grade', 'POST', payload);
+  if (currentGradeRow) currentGradeRow.hide();
+  loadGrading();
+  loadAnalysis();
+}
+
+async function loadAnalysis() {
+  if (hasEcharts()) {
+    analysisChartIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var chart = echarts.getInstanceByDom(el);
+      if (chart) chart.dispose();
+    });
+  }
+  analysisChartIds = [];
+  var courses = await api("/teacher/courses");
+  var html = '<div class="section-head"><h5 class="mb-0">作业分析</h5><span class="metric-muted">展示成绩分布与及格率</span></div>';
+  var charts = [];
+  for (var ci = 0; ci < courses.length; ci++) {
+    var c = courses[ci];
+    var assignments = await api("/teacher/courses/" + c.id + "/assignments");
+    for (var ai = 0; ai < assignments.length; ai++) {
+      var a = assignments[ai];
+      var d = await api("/teacher/assignments/" + a.id + "/analysis");
+      if (!d || !d.distribution || !d.distribution.length) continue;
+      var aid = 'ana-' + a.id;
+      charts.push({ id: aid, data: d });
+      html += '<div class="section-surface mb-3 analysis-card"><div class="d-flex justify-content-between align-items-start gap-2 mb-2"><h6 class="mb-0"><i class="fa-solid fa-chart-bar me-2" style="color:var(--accent)"></i>' + App.escapeHtml(a.title || '未命名作业') + '</h6><span class="badge-soft bg-primary bg-opacity-10 text-primary">平均分 ' + (d.average != null ? Number(d.average).toFixed(1) : '-') + '</span></div><div class="metric-row mb-2"><span>提交 ' + (d.total || 0) + '</span><span>最高 ' + (d.max != null ? d.max : '-') + '</span><span>及格率 ' + (d.passRate != null ? d.passRate : 0) + '%</span></div><div id="' + aid + '" style="height:260px"></div></div>';
+    }
+  }
+  document.getElementById("analysisBox").innerHTML = charts.length ? html : html + renderEmptyPanel('暂无分析数据', '学生提交并评分后，这里会展示成绩分布与趋势。', false, '去评分', "switchTab('grading')", 'fa-pen-nib');
+  charts.forEach(function(item) {
+    var el = document.getElementById(item.id);
+    if (!el || !hasEcharts()) return;
+    analysisChartIds.push(item.id);
+    var ch = echarts.getInstanceByDom(el) || echarts.init(el);
+    ch.setOption({
+      tooltip: {},
+      grid: { left: 40, right: 16, top: 20, bottom: 24 },
+      xAxis: { type: "category", data: item.data.buckets },
+      yAxis: { type: "value" },
+      series: [{ type: "bar", data: item.data.distribution, itemStyle: { color: "#2563eb", borderRadius: [6,6,0,0] } }]
+    });
+  });
+}
+
+function setTeacherAiPrompt(text, mode) {
+  var input = document.getElementById("teacherAiQuestion");
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+  if (mode && teacherAiModeLabels[mode]) {
+    setTeacherAiMode(mode);
+  }
+}
+
+async function loadTeacherAiAgent() {
+  var box = document.getElementById("teacherAiBox");
+  box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">知识库索引、教学数据与校园问答</span></div><div class="text-muted small">加载中...</div>';
+  try {
+    var courses = await api("/teacher/courses");
+    var options = courses.length ? courses.map(function(c) {
+      return '<option value="' + c.id + '">' + App.escapeHtml(c.name || '未命名课程') + '</option>';
+    }).join('') : '<option value="">暂无课程</option>';
+    var promptButtons = [
+      { label: "课程资料问答", text: "请根据当前课程资料，提炼这节课最适合考试复习的 5 个知识点。", mode: "course_material" },
+      { label: "教学数据诊断", text: "请结合学生提交、互评和成绩数据，指出这门课目前最需要关注的问题。", mode: "learning_analysis" },
+      { label: "生成教学建议", text: "请给我一份下周教学调整建议，包含课堂讲解、作业和学生跟进。", mode: "teaching_advice" },
+      { label: "平台操作咨询", text: "如果我要完成课程资料索引、发布作业和 AI 辅助批改，应该按什么顺序操作？", mode: "campus_faq" }
+    ];
+    box.innerHTML =
+      '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">连续对话与个性化教学助手</span></div>' +
+      '<div class="ai-workspace-grid">' +
+        '<div class="section-surface">' +
+          '<label class="form-label" for="teacherAiCourse">课程</label><select id="teacherAiCourse" class="form-select mb-2" ' + (!courses.length ? 'disabled' : '') + '>' + options + '</select>' +
+          (!courses.length ? '<div class="small text-muted mb-3">请先在课程管理中创建课程，再使用课程资料问答和索引能力。</div>' : '<div class="small text-muted mb-3">先上传课程材料或发布作业详情，再建立索引，问答结果会更稳定。</div>') +
+          '<div class="teacher-ai-status-grid">' +
+            '<div class="teacher-ai-status-card"><strong>' + courses.length + '</strong><span>可用课程</span></div>' +
+            '<div class="teacher-ai-status-card"><strong>' + teacherAiMessages.length + '</strong><span>当前对话消息</span></div>' +
+            '<div class="teacher-ai-status-card"><strong>' + (courses.length ? '可执行' : '待建课') + '</strong><span>资料索引状态</span></div>' +
+          '</div>' +
+          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="indexTeacherCourseDocs()" ' + (!courses.length ? 'disabled' : '') + '><i class="fa-solid fa-database me-1"></i>索引课程资料</button></div>' +
+          '<div id="teacherAiModes" class="ai-mode-tabs" role="tablist">' +
+            Object.keys(teacherAiModeLabels).map(function(mode) {
+              return '<button type="button" class="ai-mode-button ' + (mode === teacherAiMode ? 'active' : '') + '" data-mode="' + mode + '" onclick="setTeacherAiMode(\'' + mode + '\')">' + teacherAiModeLabels[mode] + '</button>';
+            }).join("") +
+          '</div>' +
+          '<label class="form-label" for="teacherAiQuestion">对话内容</label><textarea id="teacherAiQuestion" class="form-control mb-2" rows="3" placeholder="先选择问题分类，再输入你的问题"></textarea>' +
+          '<button class="btn btn-outline-primary btn-sm mb-3" onclick="askTeacherCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>发送</button>' +
+          '<div id="teacherAiChatHistory" class="ai-chat-history"></div>' +
+        '</div>' +
+        '<div class="section-surface">' +
+          '<div class="fw-semibold mb-2">当前对话</div>' +
+          '<div class="small text-muted">分类会直接决定助手使用的回答范围；历史对话会用于理解课程教学目标和你的工作偏好。</div>' +
+          '<div class="fw-semibold mt-3 mb-2">建议提问</div>' +
+          '<div class="ai-prompt-grid mb-3">' + promptButtons.map(function(item) {
+            return '<button type="button" class="ai-prompt-btn" data-text="' + App.escapeAttr(item.text) + '" data-mode="' + item.mode + '" onclick="setTeacherAiPrompt(this.dataset.text, this.dataset.mode)"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>' + App.escapeHtml(item.label) + '</button>';
+          }).join('') + '</div>' +
+          '<div class="ai-readiness">' +
+            '<div class="fw-semibold mb-2">使用前检查</div>' +
+            '<ul class="ai-readiness-list">' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>课程资料类问题：先选择课程并执行“索引课程资料”。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>教学数据类问题：先让学生完成提交、互评或评分，回答会包含业务数据。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>AI 批改建议：从“评分”页打开学生提交，再生成建议并由教师确认。</span></li>' +
+            '</ul>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    renderTeacherAiChat();
+  } catch (err) {
+    box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false, '重新加载', 'loadTeacherAiAgent()', 'fa-rotate');
+  }
+}
+
+async function indexTeacherCourseDocs() {
+  var courseId = document.getElementById("teacherAiCourse").value;
+  if (!courseId) {
+    App.showToast('请先选择课程', 'warning');
+    return;
+  }
+  var resultBox = document.getElementById("teacherAiChatHistory");
+  if (!resultBox) return;
+  resultBox.innerHTML = '<div class="text-muted small">正在索引课程资料...</div>';
+  try {
+    var data = await api('/ai/courses/' + courseId + '/documents/index', 'POST', {});
+    var indexedFiles = data.indexedFiles || data.indexed_files || [];
+    var summary = '课程资料索引完成：文件 ' + (data.fileCount || data.file_count || 0) + ' 个，作业 ' +
+      (data.assignmentCount || data.assignment_count || 0) + ' 个，切片 ' + (data.chunkCount || data.chunk_count || 0) + ' 个。';
+    if (indexedFiles.length) {
+      summary += '\n' + indexedFiles.map(function(item) {
+        return (item.name || '文件') + '：' + (item.status || '-') + '，chunks ' + (item.chunkCount || item.chunk_count || 0);
+      }).join('\n');
+    }
+    teacherAiMessages.push({ role: "assistant", text: summary, mode: "course_material" });
+    saveTeacherAiMessages();
+    renderTeacherAiChat();
+  } catch (err) {
+    resultBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '索引失败') + '</span>';
+  }
+}
+
+async function askTeacherCourseQa() {
+  var courseEl = document.getElementById("teacherAiCourse");
+  var courseId = courseEl && courseEl.value ? Number(courseEl.value) : null;
+  var question = document.getElementById("teacherAiQuestion").value.trim();
+  if (!question) {
+    App.showToast('请先输入问题', 'warning');
+    return;
+  }
+  var resultBox = document.getElementById("teacherAiChatHistory");
+  resultBox.innerHTML = '<div class="text-muted small">正在回复...</div>';
+  try {
+    var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: teacherAiMode });
+    teacherAiMessages.push({ role: "user", text: question, mode: teacherAiMode });
+    teacherAiMessages.push({ role: "assistant", text: data.answer || "", mode: teacherAiMode, citations: data.citations || [] });
+    saveTeacherAiMessages();
+    document.getElementById("teacherAiQuestion").value = "";
+    renderTeacherAiChat();
+  } catch (err) {
+    resultBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '问答失败') + '</span>';
+  }
+}
+
+async function requestAiGradeSuggestion() {
+  var id = Number(gradeSubmissionId.value || 0);
+  if (!id) return;
+  aiGradeSuggestionBox.innerHTML = '<span class="text-muted">正在生成 AI 批改建议...</span>';
+  try {
+    var data = await api('/ai/teacher/submissions/' + id + '/grade-suggestion', 'POST', {});
+    gradeAiSuggestionId.value = data.id || '';
+    gradeScore.value = data.suggestedScore != null ? data.suggestedScore : (data.suggested_score || '');
+    gradeComment.value = data.comment || '';
+    aiGradeSuggestionBox.innerHTML = renderGradeSuggestion(data);
+  } catch (err) {
+    aiGradeSuggestionBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || 'AI 建议生成失败') + '</span>';
+  }
+}
+
+function renderGradeSuggestion(data) {
+  var strengths = data.strengths || [];
+  var weaknesses = data.weaknesses || [];
+  var risks = data.risks || [];
+  var analysis = data.analysis || {};
+  var componentScores = analysis.componentScores || analysis.component_scores || {};
+  var metricLabels = {
+    requirements: '要求覆盖',
+    depth: '内容深度',
+    structure: '结构层次',
+    evidence: '证据支撑',
+    expression: '表达规范'
+  };
+  var metrics = Object.keys(metricLabels).map(function(key) {
+    if (componentScores[key] == null) return '';
+    return '<div class="badge-soft bg-primary bg-opacity-10 text-primary me-1 mb-1">' + metricLabels[key] + ' ' + Math.round(Number(componentScores[key]) * 100) + '%</div>';
+  }).join('');
+  var matched = analysis.matchedKeywords || analysis.matched_keywords || [];
+  var missing = analysis.missingKeywords || analysis.missing_keywords || [];
+  var keywordLine = '';
+  if (matched.length || missing.length) {
+    keywordLine = '<div class="mt-2 small text-muted">' +
+      (matched.length ? '已覆盖：' + matched.map(App.escapeHtml).join('、') : '') +
+      (matched.length && missing.length ? '；' : '') +
+      (missing.length ? '待补充：' + missing.slice(0, 4).map(App.escapeHtml).join('、') : '') +
+      '</div>';
+  }
+  return '<div><span class="fw-semibold">建议分数：</span>' + (data.suggestedScore != null ? data.suggestedScore : data.suggested_score || '-') + '</div>' +
+    (metrics ? '<div class="mt-2">' + metrics + '</div>' : '') +
+    keywordLine +
+    '<div class="mt-1" style="white-space:pre-wrap">' + App.escapeHtml(data.comment || '') + '</div>' +
+    (strengths.length ? '<div class="mt-2 text-success">优点：' + strengths.map(App.escapeHtml).join('；') + '</div>' : '') +
+    (weaknesses.length ? '<div class="mt-1 text-warning">改进：' + weaknesses.map(App.escapeHtml).join('；') + '</div>' : '') +
+    (risks.length ? '<div class="mt-1 text-danger">风险：' + risks.map(App.escapeHtml).join('；') + '</div>' : '');
+}
+
+async function approveAiGradeSuggestion() {
+  var suggestionId = gradeAiSuggestionId.value;
+  if (!suggestionId) {
+    App.showToast('请先生成 AI 建议', 'warning');
+    return;
+  }
+  await api('/ai/feedback/' + suggestionId + '/approve', 'POST', {});
+  App.showToast('AI 建议已采用');
+  if (currentGradeRow) currentGradeRow.hide();
+  loadGrading();
+  loadAnalysis();
+}
+
+async function modifyAiGradeSuggestion() {
+  var suggestionId = gradeAiSuggestionId.value;
+  if (!suggestionId) {
+    App.showToast('请先生成 AI 建议', 'warning');
+    return;
+  }
+  await api('/ai/feedback/' + suggestionId, 'PUT', {
+    score: Number(gradeScore.value || 0),
+    comment: gradeComment.value.trim(),
+    action: 'MODIFIED'
+  });
+  App.showToast('AI 建议已按当前内容保存');
+  if (currentGradeRow) currentGradeRow.hide();
+  loadGrading();
+  loadAnalysis();
+}
+
+async function regenerateAiGradeSuggestion() {
+  var suggestionId = gradeAiSuggestionId.value;
+  if (!suggestionId) {
+    return requestAiGradeSuggestion();
+  }
+  aiGradeSuggestionBox.innerHTML = '<span class="text-muted">正在重新生成...</span>';
+  try {
+    var data = await api('/ai/feedback/' + suggestionId + '/regenerate', 'POST', {});
+    gradeAiSuggestionId.value = data.id || '';
+    gradeScore.value = data.suggestedScore != null ? data.suggestedScore : (data.suggested_score || '');
+    gradeComment.value = data.comment || '';
+    aiGradeSuggestionBox.innerHTML = renderGradeSuggestion(data);
+  } catch (err) {
+    aiGradeSuggestionBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '重新生成失败') + '</span>';
+  }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
