@@ -320,6 +320,14 @@ window.App = (function () {
     sb.classList.toggle("sidebar-open");
   };
 
+  document.addEventListener("click", function(e) {
+    var sb = document.querySelector(".sidebar");
+    var btn = document.getElementById("mobileMenuBtn");
+    if (!sb || !sb.classList.contains("sidebar-open")) return;
+    if (sb.contains(e.target) || (btn && btn.contains(e.target))) return;
+    sb.classList.remove("sidebar-open");
+  });
+
   return {
     initTheme: initTheme,
     initRoleIdentityMarker: initRoleIdentityMarker,
