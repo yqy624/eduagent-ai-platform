@@ -12,13 +12,26 @@ venv/
 .vscode/
 *.swp
 
+# Local agent/runtime artifacts
+.codex/
+.agents/
+
 # 环境变量
 .env
+.env.local
+.env.*.local
 
 # 上传文件
 uploads/
 logs/
 *.db
+*.sqlite
+*.sqlite3
+
+# AI/vector store runtime data
+ai/data/vector_store/
+data/chroma/
+chroma/
 
 # OS
 .DS_Store

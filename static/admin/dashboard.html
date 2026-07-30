@@ -6,8 +6,8 @@
   <title>管理员工作台</title>
   <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <script src="/static/js/echarts.min.js?v=20260705"></script>
-  <link href="/static/css/app.css?v=20260705" rel="stylesheet">
+  <script src="/static/js/echarts.min.js?v=20260730"></script>
+  <link href="/static/css/app.css?v=20260730" rel="stylesheet">
   <style>
     .quick-action-grid,.monitor-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
     .quick-action-btn{display:flex;align-items:center;gap:10px;justify-content:center;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--bg-card);box-shadow:var(--shadow);color:var(--text-main);font-weight:600}
@@ -78,6 +78,21 @@
         <div class="eyebrow"><i class="fa-solid fa-gauge-high"></i> 系统概览</div>
         <div class="title">欢迎回来，<span id="heroName">管理员</span></div>
         <div class="desc">集中查看平台核心指标、待办事项和运行状态，快速完成管理操作。</div>
+      </div>
+      <div class="workflow-guide mb-3" aria-label="管理员演示流程">
+        <div class="workflow-guide-head">
+          <div>
+            <div class="workflow-guide-kicker">开源演示路径</div>
+            <div class="workflow-guide-title">从账号、课程到平台运营，一条链路完成初始化。</div>
+          </div>
+          <span class="workflow-guide-badge">Admin Flow</span>
+        </div>
+        <div class="workflow-steps">
+          <div class="workflow-step"><span>1</span><strong>创建三类账号</strong><small>管理员、教师、学生角色边界清晰。</small></div>
+          <div class="workflow-step"><span>2</span><strong>配置课程与选课</strong><small>课程容量、教师归属、学生名单统一管理。</small></div>
+          <div class="workflow-step"><span>3</span><strong>发布活动通知</strong><small>公告进入教师端和学生端首页。</small></div>
+          <div class="workflow-step"><span>4</span><strong>监控运行状态</strong><small>用业务指标判断平台是否健康。</small></div>
+        </div>
       </div>
       <div class="kpi-grid mb-3" id="kpiGrid"></div>
       <div class="section-card mb-3">
@@ -240,10 +255,10 @@
 </div>
 
 <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
-<script src="/static/js/app.js?v=20260705"></script>
+<script src="/static/js/app.js?v=20260730"></script>
 <script>
 window.TOKEN = new URLSearchParams(location.search).get("token") || localStorage.getItem("token") || "";
-if (!TOKEN) location.href = "/login.html";
+if (!TOKEN) location.href = "/";
 App.initTheme();
 App.initNotifications(TOKEN);
 App.setBreadcrumb(["管理员工作台", "概览"]);
@@ -367,8 +382,11 @@ function createUser() {
   });
 }
 
-function renderEmptyPanel(title, desc, compact) {
-  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div></div></div>';
+function renderEmptyPanel(title, desc, compact, actionLabel, actionHandler, icon) {
+  var action = actionLabel && actionHandler
+    ? '<div class="empty-panel-actions"><button class="btn btn-primary btn-sm" type="button" onclick="' + actionHandler + '"><i class="fa-solid ' + (icon || 'fa-arrow-right') + ' me-1"></i>' + App.escapeHtml(actionLabel) + '</button></div>'
+    : '';
+  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div>' + action + '</div></div>';
 }
 
 function renderActivityAudience(audience) {
@@ -480,7 +498,7 @@ function renderDashboard(data) {
     ? topCourses.map(function(item, index) {
         return '<div class="rank-item"><div><div class="fw-semibold">TOP ' + (index + 1) + ' · ' + App.escapeHtml(item.name || "未命名课程") + '</div><div class="small text-muted">教师：' + App.escapeHtml(item.teacher || "未分配教师") + '</div></div><span class="badge text-bg-primary">' + (item.value || 0) + ' 人</span></div>';
       }).join("")
-    : renderEmptyPanel('暂无课程排行', '课程有选课记录后，会在这里显示热门课程。', true);
+    : renderEmptyPanel('暂无课程排行', '课程有选课记录后，会在这里显示热门课程。', true, '查看课程管理', "switchTab('courses')", 'fa-book');
 
   var overviewCards = [];
   var pendingTeacherRequests = getDashboardField(data, "pendingTeacherRequests", "pending_teacher_requests", 0);
@@ -590,7 +608,7 @@ function renderRoleChart(items) {
     charts.roles = null;
   }
   if (!safeItems.length) {
-    chartEl.innerHTML = renderEmptyPanel('暂无角色数据', '创建用户后，这里会展示学生、教师和管理员的占比。', false);
+    chartEl.innerHTML = renderEmptyPanel('暂无角色数据', '创建用户后，这里会展示学生、教师和管理员的占比。', false, '新增用户', 'openUserForm()', 'fa-user-plus');
     return;
   }
   var total = safeItems.reduce(function(sum, item) { return sum + Number(item.value || 0); }, 0);
@@ -624,7 +642,7 @@ function renderActivities(list, targetId) {
     ? '<div class="d-flex flex-column gap-3">' + list.map(function(item) {
         return '<div class="section-surface"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div class="flex-grow-1"><div class="fw-semibold">' + App.escapeHtml(item.title || '未命名活动') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(item.content || '暂无活动内容') + '</div><div class="small text-muted mt-2">发布时间：' + App.fmtTime(item.publishedAt) + ' · 受众：' + App.escapeHtml(renderActivityAudience(item.audience)) + ' · 版本：' + (item.publishVersion || 1) + '</div></div><div class="d-flex flex-column align-items-end gap-2"><span class="badge-soft ' + renderActivityStatusClass(item.status) + '">' + renderActivityStatus(item.status) + '</span><div class="d-flex gap-2 flex-wrap justify-content-end"><button class="btn btn-outline-primary btn-sm" onclick="editActivity(' + item.id + ')">编辑</button><button class="btn btn-outline-warning btn-sm" onclick="republishActivity(' + item.id + ')">重新发布</button><button class="btn btn-outline-danger btn-sm" onclick="deleteActivity(' + item.id + ')">删除</button></div></div></div></div>';
       }).join('') + '</div>'
-    : renderEmptyPanel('暂无活动记录', '发布活动后，这里会显示可编辑、可删除、可重新发布的活动列表。', false);
+    : renderEmptyPanel('暂无活动记录', '发布活动后，这里会显示可编辑、可删除、可重新发布的活动列表。', false, '发布活动', 'openActivityModal()', 'fa-bullhorn');
 }
 
 function loadActivities() {
@@ -670,7 +688,7 @@ function loadUsers() {
       ? '<div class="table-wrap"><table class="table table-hover align-middle"><thead><tr><th>ID</th><th>用户名</th><th>显示名称</th><th>邮箱</th><th>角色</th><th>状态</th><th>操作</th></tr></thead><tbody>' + (page.content || []).map(function(u) {
           return '<tr><td>' + u.id + '</td><td>' + App.escapeHtml(u.username || "-") + '</td><td>' + App.escapeHtml(u.displayName || "未填写") + '</td><td>' + App.escapeHtml(u.email || "未填写邮箱") + '</td><td><span class="badge-soft ' + (u.role === "ADMIN" ? "bg-primary bg-opacity-10 text-primary" : u.role === "TEACHER" ? "bg-success bg-opacity-10 text-success" : "bg-info bg-opacity-10 text-info") + '">' + App.escapeHtml(u.role || "-") + '</span></td><td>' + (u.enabled ? '<span class="status-pill"><span class="color-dot bg-success"></span>启用</span>' : '<span class="status-pill" style="background:rgba(220,38,38,.12);color:#dc2626"><span class="color-dot bg-danger"></span>禁用</span>') + '</td><td class="d-flex gap-1 flex-wrap"><button class="btn btn-outline-secondary btn-sm" onclick="resetPassword(' + u.id + ')"><i class="fa-solid fa-key"></i></button><button class="btn btn-outline-primary btn-sm" onclick="toggleUser(' + u.id + ')"><i class="fa-solid fa-toggle-on"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteUser(' + u.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
         }).join("") + '</tbody></table>' + renderUserPager(total, userPage) + '</div>'
-      : renderEmptyPanel('暂无用户数据', '当前筛选条件下没有匹配的用户记录。', false);
+      : renderEmptyPanel('暂无用户数据', '当前筛选条件下没有匹配的用户记录。', false, '新增用户', 'openUserForm()', 'fa-user-plus');
   });
 }
 
@@ -696,7 +714,7 @@ function loadCourses() {
             var visible = c.visible === false ? '<span class="badge text-bg-secondary">已下架</span>' : '<span class="badge text-bg-success">已上架</span>';
             return '<tr><td><input type="checkbox" class="course-select" value="' + c.id + '"></td><td>' + c.id + '</td><td><div class="fw-semibold text-truncate">' + App.escapeHtml(c.name || "未命名课程") + '</div><div class="small text-muted text-truncate">' + App.escapeHtml(c.description || "暂无课程简介") + '</div></td><td class="text-truncate">' + App.escapeHtml(teacherName) + '</td><td class="text-truncate">' + App.escapeHtml(c.schedule || "时间待定") + '</td><td class="text-truncate">' + App.escapeHtml(c.category || "未分类") + '</td><td>' + (c.enrolledCount || 0) + '/' + (c.maxStudents || 0) + '</td><td>' + visible + '</td><td><div class="admin-course-actions"><button class="btn btn-outline-primary btn-sm" onclick="openCourseEdit(' + c.id + ')">编辑信息</button><button class="btn btn-outline-secondary btn-sm" onclick="openEnrollmentAdjust(' + c.id + ')">调整选课</button><button class="btn btn-outline-warning btn-sm" onclick="toggleCourseVisibility(' + c.id + ')">' + (c.visible === false ? '上架' : '下架') + '</button><button class="btn btn-outline-danger btn-sm" onclick="deleteCourse(' + c.id + ')">删除课程</button></div></td></tr>';
           }).join("") + '</tbody></table></div>'
-        : renderEmptyPanel('暂无课程数据', '当前筛选条件下没有可管理的课程。', false);
+        : renderEmptyPanel('暂无课程数据', '当前筛选条件下没有可管理的课程。教师端创建课程后，管理员可在这里调整选课、上下架和容量。', false, '新增教师账号', 'openUserForm()', 'fa-user-plus');
     });
   });
 }

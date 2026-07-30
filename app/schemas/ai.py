@@ -82,6 +82,7 @@ class GradingSuggestionResponse(BaseModel):
     strengths: List[str] = []
     weaknesses: List[str] = []
     risks: List[str] = []
+    analysis: Dict[str, Any] = {}
 
 
 class FeedbackUpdateRequest(BaseModel):

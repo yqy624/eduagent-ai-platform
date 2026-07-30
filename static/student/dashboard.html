@@ -6,8 +6,8 @@
   <title>学生工作台</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
-  <script src="/static/js/echarts.min.js?v=20260705"></script>
-  <link href="/static/css/app.css?v=20260705" rel="stylesheet">
+  <script src="/static/js/echarts.min.js?v=20260730"></script>
+  <link href="/static/css/app.css?v=20260730" rel="stylesheet">
   <style>
     .global-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .global-overview-item{border:1px solid var(--border);border-radius:14px;background:var(--bg-soft);padding:14px;min-height:96px}
@@ -37,8 +37,33 @@
     .ai-session-meta{font-size:12px;color:var(--text-muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .ai-session-actions{display:flex;gap:6px}
     .ai-session-actions .btn{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center}
-    @media (max-width: 992px){.ai-workspace-grid{grid-template-columns:1fr}}
-    @media (max-width: 576px){.global-overview-grid{grid-template-columns:1fr}.global-next-action{align-items:flex-start;flex-direction:column}}
+    .learning-course-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .learning-course-item,.learning-task-item,.learning-grade-item,.learning-peer-item{border:1px solid var(--border);border-radius:14px;background:var(--bg-card);padding:16px;box-shadow:var(--shadow-sm)}
+    .learning-course-item{display:flex;flex-direction:column;gap:12px;min-height:190px}
+    .learning-course-head,.learning-task-head,.learning-grade-head,.learning-peer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .learning-course-title,.learning-task-title,.learning-grade-title{font-weight:800;color:var(--text-main);line-height:1.35}
+    .learning-meta-list{display:grid;gap:8px;color:var(--text-muted);font-size:13px}
+    .learning-meta-list span{display:flex;align-items:center;gap:8px;min-width:0}
+    .learning-progress{height:8px;border-radius:999px;background:rgba(148,163,184,.18);overflow:hidden}
+    .learning-progress span{display:block;height:100%;border-radius:999px;background:var(--accent)}
+    .learning-task-list,.learning-grade-list,.learning-peer-list{display:grid;gap:12px}
+    .learning-task-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center}
+    .learning-task-copy{min-width:0}
+    .learning-task-desc{margin-top:8px;color:var(--text-muted);font-size:13px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .learning-task-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+    .learning-grade-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,.35fr);gap:14px;align-items:center}
+    .learning-score{font-size:34px;font-weight:900;color:var(--accent);line-height:1;text-align:right}
+    .learning-feedback{color:var(--text-muted);font-size:13px;line-height:1.6;margin-top:8px}
+    .learning-peer-item{display:grid;gap:12px}
+    .learning-ai-readiness-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+    .learning-ai-readiness-card{border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);padding:12px}
+    .learning-ai-readiness-card strong{display:block;color:var(--text-main);font-size:18px;line-height:1.1}
+    .learning-ai-readiness-card span{display:block;color:var(--text-muted);font-size:12px;margin-top:5px}
+    .ai-prompt-grid{display:grid;gap:8px}
+    .ai-prompt-btn{width:100%;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);color:var(--text-main);padding:10px 12px;text-align:left;font-size:13px;line-height:1.45}
+    .ai-prompt-btn:hover{border-color:var(--accent);color:var(--accent)}
+    @media (max-width: 992px){.ai-workspace-grid{grid-template-columns:1fr}.learning-task-item,.learning-grade-item{grid-template-columns:1fr}.learning-score{text-align:left}.learning-task-actions{justify-content:flex-start}}
+    @media (max-width: 576px){.global-overview-grid{grid-template-columns:1fr}.global-next-action,.learning-course-head,.learning-task-head,.learning-grade-head{align-items:flex-start;flex-direction:column}.learning-course-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body class="page-shell" data-role="student">
@@ -85,6 +110,22 @@
         <div class="eyebrow"><i class="fa-solid fa-user-graduate"></i> 学习概览</div>
         <div class="title">欢迎回来，<span id="heroName">同学</span></div>
         <div class="desc">查看课程进度、待提交作业、匿名互评和最新成绩，合理规划学习时间。</div>
+      </div>
+      <div class="workflow-guide mb-3" aria-label="学生演示流程">
+        <div class="workflow-guide-head">
+          <div>
+            <div class="workflow-guide-kicker">开源演示路径</div>
+            <div class="workflow-guide-title">从选课到学习计划，学生能看到任务、反馈和 AI 支持的完整路径。</div>
+          </div>
+          <span class="workflow-guide-badge">Student Flow</span>
+        </div>
+        <div class="workflow-steps">
+          <div class="workflow-step"><span>1</span><strong>选择课程</strong><small>加入课程后同步看到作业任务。</small></div>
+          <div class="workflow-step"><span>2</span><strong>提交作业</strong><small>文本和附件都进入教师评分流程。</small></div>
+          <div class="workflow-step"><span>3</span><strong>完成互评</strong><small>匿名评价为课堂反馈补充视角。</small></div>
+          <div class="workflow-step"><span>4</span><strong>查看成绩反馈</strong><small>成绩、评语和互评加分集中展示。</small></div>
+          <div class="workflow-step"><span>5</span><strong>生成学习计划</strong><small>AI 根据薄弱点给出一周学习安排。</small></div>
+        </div>
       </div>
       <div class="kpi-grid mb-3" id="kpiGrid"></div>
       <div class="row g-3 align-items-stretch">
@@ -213,10 +254,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="/static/js/app.js?v=20260705"></script>
+<script src="/static/js/app.js?v=20260730"></script>
 <script>
 window.TOKEN = new URLSearchParams(location.search).get("token") || localStorage.getItem("token") || "";
-if (!TOKEN) location.href = "/login.html";
+if (!TOKEN) location.href = "/";
 App.initTheme();
 App.initNotifications(TOKEN);
 App.setBreadcrumb(["学生工作台", "概览"]);
@@ -485,8 +526,11 @@ function renderPager(total, page, target, action) {
   return html;
 }
 
-function renderEmptyPanel(title, desc, compact) {
-  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div></div></div>';
+function renderEmptyPanel(title, desc, compact, actionLabel, actionHandler, icon) {
+  var action = actionLabel && actionHandler
+    ? '<div class="empty-panel-actions"><button class="btn btn-primary btn-sm" type="button" onclick="' + actionHandler + '"><i class="fa-solid ' + (icon || 'fa-arrow-right') + ' me-1"></i>' + App.escapeHtml(actionLabel) + '</button></div>'
+    : '';
+  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div>' + action + '</div></div>';
 }
 
 function dashboardField(data, camelKey, snakeKey, fallback) {
@@ -616,19 +660,31 @@ async function loadCourses() {
   var myIds = {};
   myCourses.forEach(function(c) { myIds[c.id] = true; });
   if (!courses.length) {
-    document.getElementById("courseBox").innerHTML = '<div class="section-head"><h5 class="mb-0">课程列表</h5></div>' + renderEmptyPanel('暂无可选课程', '当前没有可选课程，稍后可再次刷新查看。', false);
+    document.getElementById("courseBox").innerHTML = '<div class="section-head"><h5 class="mb-0">课程列表</h5></div>' + renderEmptyPanel('暂无可选课程', '当前没有可选课程，稍后可再次刷新查看。', false, '刷新课程', 'loadCourses()', 'fa-rotate');
     return;
   }
   var pages = Math.max(1, Math.ceil(courses.length / pageSize));
   if (coursePage > pages) coursePage = pages;
   var start = (coursePage - 1) * pageSize;
   var pageCourses = courses.slice(start, start + pageSize);
-  document.getElementById("courseBox").innerHTML = '<div class="section-head"><h5 class="mb-0">课程列表</h5><span class="metric-muted">共 ' + courses.length + ' 门课程</span></div><div class="table-wrap"><table class="table table-hover align-middle student-course-table"><thead><tr><th>课程</th><th>教师</th><th>时间</th><th>学分</th><th>容量</th><th></th></tr></thead><tbody>' +
+  document.getElementById("courseBox").innerHTML = '<div class="section-head"><h5 class="mb-0">课程列表</h5><span class="metric-muted">共 ' + courses.length + ' 门课程</span></div><div class="learning-course-grid">' +
     pageCourses.map(function(c) {
       var enrolled = myIds[c.id];
-      return '<tr><td><span class="fw-semibold">' + App.escapeHtml(c.name || '未命名课程') + '</span></td><td>' + App.escapeHtml(c.teacherName || '未分配教师') + '</td><td>' + App.escapeHtml(c.schedule || '时间待定') + '</td><td>' + (c.credits != null ? c.credits : '未设置') + '</td><td>' + (c.enrolledCount || 0) + '/' + (c.maxStudents || 50) + '</td><td>' +
-        (enrolled ? '<span class="badge-soft bg-success bg-opacity-10 text-success"><i class="fa-solid fa-check me-1"></i>已选</span>' : '<button class="btn btn-primary btn-sm" onclick="enrollCourse(' + c.id + ')"><i class="fa-solid fa-plus me-1"></i>选课</button>') + '</td></tr>';
-    }).join('') + '</tbody></table>' + renderPager(courses.length, coursePage, 'courses', 'goCoursePage') + '</div>';
+      var maxStudents = Number(c.maxStudents || 50);
+      var enrolledCount = Number(c.enrolledCount || 0);
+      var capacity = percentValue(enrolledCount, maxStudents);
+      return '<div class="learning-course-item">' +
+        '<div class="learning-course-head"><div><div class="learning-course-title">' + App.escapeHtml(c.name || '未命名课程') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(c.description || '暂无课程简介') + '</div></div>' +
+        (enrolled ? '<span class="badge-soft bg-success bg-opacity-10 text-success"><i class="fa-solid fa-check me-1"></i>已加入</span>' : '<span class="badge-soft bg-primary bg-opacity-10 text-primary">可选</span>') + '</div>' +
+        '<div class="learning-meta-list">' +
+          '<span><i class="fa-solid fa-user-tie"></i>' + App.escapeHtml(c.teacherName || '未分配教师') + '</span>' +
+          '<span><i class="fa-solid fa-calendar-days"></i>' + App.escapeHtml(c.schedule || '时间待定') + '</span>' +
+          '<span><i class="fa-solid fa-graduation-cap"></i>' + (c.credits != null ? c.credits : '未设置') + ' 学分</span>' +
+        '</div>' +
+        '<div><div class="d-flex justify-content-between small text-muted mb-1"><span>课程容量</span><span>' + enrolledCount + '/' + maxStudents + '</span></div><div class="learning-progress"><span style="width:' + capacity + '%"></span></div></div>' +
+        '<div class="mt-auto">' + (enrolled ? '<button class="btn btn-outline-primary btn-sm" onclick="switchTab(\'assignments\')"><i class="fa-solid fa-file-circle-check me-1"></i>查看作业</button>' : '<button class="btn btn-primary btn-sm" onclick="enrollCourse(' + c.id + ')"><i class="fa-solid fa-plus me-1"></i>加入课程</button>') + '</div>' +
+      '</div>';
+    }).join('') + '</div>' + renderPager(courses.length, coursePage, 'courses', 'goCoursePage');
 }
 
 function goCoursePage(page) {
@@ -671,35 +727,41 @@ async function loadAssignments() {
     });
   }
   if (!rows.length) {
-    document.getElementById("assignmentBox").innerHTML = '<div class="section-head"><h5 class="mb-0">作业列表</h5></div>' + renderEmptyPanel('暂无作业任务', '选课后发布的作业会集中显示在这里。', false);
+    document.getElementById("assignmentBox").innerHTML = '<div class="section-head"><h5 class="mb-0">作业列表</h5></div>' + renderEmptyPanel('暂无作业任务', '选课后发布的作业会集中显示在这里。', false, '去选课', "switchTab('courses')", 'fa-book');
     return;
   }
   var pages = Math.max(1, Math.ceil(rows.length / pageSize));
   if (assignmentPage > pages) assignmentPage = pages;
   var start = (assignmentPage - 1) * pageSize;
   var pageRows = rows.slice(start, start + pageSize);
-  var html = '<div class="section-head"><h5 class="mb-0">作业列表</h5><span class="metric-muted">共 ' + rows.length + ' 项作业</span></div>';
-  var currentCourseId = null;
+  var html = '<div class="section-head"><h5 class="mb-0">学习任务</h5><span class="metric-muted">共 ' + rows.length + ' 项作业</span></div><div class="learning-task-list">';
   pageRows.forEach(function(row, index) {
     var c = row.course;
     var a = row.assignment;
-    if (currentCourseId !== c.id) {
-      if (currentCourseId !== null) html += '</tbody></table></div>';
-      currentCourseId = c.id;
-      html += '<div class="section-head mt-3"><h5 class="mb-0"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h5></div>' +
-        '<div class="table-wrap"><table class="table table-sm align-middle student-assignment-table"><thead><tr><th>标题</th><th>截止时间</th><th>满分</th><th>互评</th><th>提交内容</th><th></th></tr></thead><tbody>';
-    }
-    var submitted = row.submission && row.submission.content ? App.escapeHtml(row.submission.content) : '暂无提交内容';
+    var submitted = row.submission && row.submission.content ? App.escapeHtml(row.submission.content) : '尚未提交正文';
     var detailBtn = '<button class="btn btn-outline-secondary btn-sm me-2" onclick="openSubmissionDetail(' + a.id + ')"><i class="fa-solid fa-eye me-1"></i>详情</button>';
     var canSubmit = a.status !== 'CLOSED' && a.submissionStatus !== 'GRADED';
     var submitText = row.submission ? '重新提交' : '提交';
     if (a.status === 'CLOSED') submitText = '已截止';
     if (a.submissionStatus === 'GRADED') submitText = '已评分';
-    var peerBadge = a.peerReviewEnabled ? '<span class="badge-soft bg-info bg-opacity-10 text-info">已开放</span>' : '<span class="badge-soft bg-secondary bg-opacity-10 text-secondary">未开放</span>';
-    html += '<tr><td>' + App.escapeHtml(a.title || '未命名作业') + '</td><td>' + (App.fmtTime(a.dueDate) || '无截止时间') + '</td><td>' + (a.totalPoints || 100) + '</td><td>' + peerBadge + '</td><td>' + submitted + '</td><td>' + detailBtn + '<button class="btn btn-outline-primary btn-sm" data-title="' + App.escapeAttr(a.title || '未命名作业') + '" onclick="openSubmit(' + a.id + ', this.dataset.title)" ' + (canSubmit ? '' : 'disabled') + '><i class="fa-solid fa-upload me-1"></i>' + submitText + '</button></td></tr>';
-    if (index === pageRows.length - 1) html += '</tbody></table>' + renderPager(rows.length, assignmentPage, 'assignments', 'goAssignmentPage') + '</div>';
+    var status = a.submissionStatus === 'GRADED'
+      ? { text: '已评分', cls: 'bg-success bg-opacity-10 text-success', icon: 'fa-circle-check' }
+      : row.submission
+        ? { text: '已提交', cls: 'bg-warning bg-opacity-10 text-warning', icon: 'fa-clock' }
+        : a.status === 'CLOSED'
+          ? { text: '已截止', cls: 'bg-secondary bg-opacity-10 text-secondary', icon: 'fa-lock' }
+          : { text: '待提交', cls: 'bg-danger bg-opacity-10 text-danger', icon: 'fa-hourglass-half' };
+    var peerBadge = a.peerReviewEnabled ? '<span class="badge-soft bg-info bg-opacity-10 text-info"><i class="fa-solid fa-comments me-1"></i>互评开放</span>' : '<span class="badge-soft bg-secondary bg-opacity-10 text-secondary">互评未开放</span>';
+    html += '<div class="learning-task-item">' +
+      '<div class="learning-task-copy">' +
+        '<div class="learning-task-head"><div><div class="learning-task-title">' + App.escapeHtml(a.title || '未命名作业') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(c.name || '未命名课程') + ' · 截止 ' + (App.fmtTime(a.dueDate) || '无截止时间') + ' · 满分 ' + (a.totalPoints || 100) + '</div></div><span class="badge-soft ' + status.cls + '"><i class="fa-solid ' + status.icon + ' me-1"></i>' + status.text + '</span></div>' +
+        '<div class="learning-task-desc">' + App.escapeHtml(a.description || a.detail || submitted) + '</div>' +
+        '<div class="d-flex flex-wrap gap-2 mt-3"><span class="badge-soft bg-primary bg-opacity-10 text-primary"><i class="fa-solid fa-file-lines me-1"></i>' + submitted + '</span>' + peerBadge + '</div>' +
+      '</div>' +
+      '<div class="learning-task-actions">' + detailBtn + '<button class="btn btn-primary btn-sm" data-title="' + App.escapeAttr(a.title || '未命名作业') + '" onclick="openSubmit(' + a.id + ', this.dataset.title)" ' + (canSubmit ? '' : 'disabled') + '><i class="fa-solid fa-upload me-1"></i>' + submitText + '</button></div>' +
+    '</div>';
   });
-  document.getElementById("assignmentBox").innerHTML = html;
+  document.getElementById("assignmentBox").innerHTML = html + '</div>' + renderPager(rows.length, assignmentPage, 'assignments', 'goAssignmentPage');
 }
 
 function goAssignmentPage(page) {
@@ -786,23 +848,28 @@ async function loadPeerReviews() {
   peerReviewGroups = await api("/student/peer-reviews");
   var html = '<div class="section-head"><h5 class="mb-0">匿名互评</h5></div>';
   if (!peerReviewGroups.length) {
-    document.getElementById("peerReviewBox").innerHTML = html + '<div class="text-muted text-center py-5">当前没有可参与的互评任务</div>';
+    document.getElementById("peerReviewBox").innerHTML = html + renderEmptyPanel('暂无互评任务', '教师开放互评后，这里会显示可评价的匿名作业。', false, '查看作业', "switchTab('assignments')", 'fa-file-circle-check');
     return;
   }
+  html += '<div class="learning-peer-list">';
   peerReviewGroups.forEach(function(group) {
-    html += '<div class="section-surface mb-3"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3"><div><h6 class="mb-1">' + App.escapeHtml(group.courseName) + ' / ' + App.escapeHtml(group.assignmentTitle) + '</h6><div class="small text-muted">' + App.escapeHtml(group.prompt || '请根据作业质量给出客观、具体的匿名评价。') + '</div></div><div class="text-end"><div class="small text-muted">已完成 ' + group.completedCount + ' / ' + group.requiredCount + '</div><div class="fw-semibold text-primary">已获加分 ' + Number(group.bonusEarned || 0).toFixed(1) + '</div></div></div>';
-    html += '<div class="table-wrap"><table class="table table-sm align-middle student-peer-table"><thead><tr><th>状态</th><th>评价对象</th><th>作业内容</th><th>评分</th><th>评语</th><th></th></tr></thead><tbody>';
+    html += '<div class="learning-peer-item"><div class="learning-peer-head"><div><div class="learning-task-title">' + App.escapeHtml(group.assignmentTitle || '互评任务') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(group.courseName || '未关联课程') + ' · ' + App.escapeHtml(group.prompt || '请根据作业质量给出客观、具体的匿名评价。') + '</div></div><div class="text-end"><span class="badge-soft bg-primary bg-opacity-10 text-primary">已完成 ' + group.completedCount + ' / ' + group.requiredCount + '</span><div class="fw-semibold text-primary mt-2">已获加分 ' + Number(group.bonusEarned || 0).toFixed(1) + '</div></div></div>';
+    html += '<div class="learning-task-list">';
     group.reviews.forEach(function(item, index) {
       var statusText = item.status === 'BONUS_GRANTED' ? '已加分' : item.status === 'SUBMITTED' ? '已提交' : '待评价';
       var statusClass = item.status === 'BONUS_GRANTED' ? 'bg-success bg-opacity-10 text-success' : item.status === 'SUBMITTED' ? 'bg-warning bg-opacity-10 text-warning' : 'bg-secondary bg-opacity-10 text-secondary';
       var target = item.selectedTarget || (item.candidateTargets && item.candidateTargets.length ? item.candidateTargets[0] : null);
       var targetName = target ? App.escapeHtml(target.studentName || '同学') : '-';
       var content = target ? App.escapeHtml(target.content || '-') : App.escapeHtml(item.preview || '-');
-      html += '<tr><td><span class="badge-soft ' + statusClass + '">' + statusText + '</span></td><td>' + targetName + '</td><td style="max-width:360px;white-space:pre-wrap;">' + content + '</td><td>' + (item.rating != null ? item.rating + ' / 5' : '-') + '</td><td style="max-width:320px;white-space:pre-wrap;">' + App.escapeHtml(item.comment || '-') + '</td><td>' + (item.status === 'ASSIGNED' ? '<button class="btn btn-outline-primary btn-sm" onclick="openPeerReviewModal(' + group.assignmentId + ', ' + index + ')"><i class="fa-solid fa-pen-to-square me-1"></i>去互评</button>' : '<span class="small text-muted">' + (item.submittedAt ? App.fmtTime(item.submittedAt) : '') + '</span>') + '</td></tr>';
+      html += '<div class="learning-task-item"><div class="learning-task-copy">' +
+        '<div class="learning-task-head"><div><div class="fw-semibold">评价对象：' + targetName + '</div><div class="small text-muted mt-1">评分 ' + (item.rating != null ? item.rating + ' / 5' : '待填写') + (item.submittedAt ? ' · ' + App.fmtTime(item.submittedAt) : '') + '</div></div><span class="badge-soft ' + statusClass + '">' + statusText + '</span></div>' +
+        '<div class="learning-task-desc">' + content + '</div>' +
+        '<div class="learning-feedback">' + App.escapeHtml(item.comment || '提交互评后，这里会保留你的评价意见。') + '</div>' +
+      '</div><div class="learning-task-actions">' + (item.status === 'ASSIGNED' ? '<button class="btn btn-primary btn-sm" onclick="openPeerReviewModal(' + group.assignmentId + ', ' + index + ')"><i class="fa-solid fa-pen-to-square me-1"></i>去互评</button>' : '<span class="small text-muted">已处理</span>') + '</div></div>';
     });
-    html += '</tbody></table></div></div>';
+    html += '</div></div>';
   });
-  document.getElementById("peerReviewBox").innerHTML = html;
+  document.getElementById("peerReviewBox").innerHTML = html + '</div>';
 }
 
 function openPeerReviewModal(assignmentId, reviewIndex) {
@@ -874,20 +941,26 @@ async function submitPeerReview() {
 async function loadGrades() {
   var grades = await api("/student/grades");
   if (!grades.length) {
-    document.getElementById("gradeBox").innerHTML = '<div class="section-head"><h5 class="mb-0">成绩列表</h5></div>' + renderEmptyPanel('暂无成绩记录', '老师完成批改后，这里会显示课程成绩、评语和互评分。', false);
+    document.getElementById("gradeBox").innerHTML = '<div class="section-head"><h5 class="mb-0">成绩列表</h5></div>' + renderEmptyPanel('暂无成绩记录', '老师完成批改后，这里会显示课程成绩、评语和互评分。', false, '查看作业', "switchTab('assignments')", 'fa-file-circle-check');
     return;
   }
   var pages = Math.max(1, Math.ceil(grades.length / pageSize));
   if (gradePage > pages) gradePage = pages;
   var start = (gradePage - 1) * pageSize;
   var pageGrades = grades.slice(start, start + pageSize);
-  document.getElementById("gradeBox").innerHTML = '<div class="section-head"><h5 class="mb-0">成绩列表</h5><span class="metric-muted">共 ' + grades.length + ' 条记录</span></div><div class="table-wrap"><table class="table table-hover align-middle student-grade-table"><thead><tr><th>课程</th><th>作业</th><th>状态</th><th>提交内容</th><th>教师分</th><th>互评加分</th><th>总分</th><th>评语</th></tr></thead><tbody>' +
+  document.getElementById("gradeBox").innerHTML = '<div class="section-head"><h5 class="mb-0">成绩反馈</h5><span class="metric-muted">共 ' + grades.length + ' 条记录</span></div><div class="learning-grade-list">' +
     pageGrades.map(function(g) {
       var statusMap = { GRADED: '已评分', SUBMITTED: '已提交', PENDING: '待提交' };
       var statusText = statusMap[g.status] || '未提交';
       var statusBadge = g.status === 'GRADED' ? 'bg-success bg-opacity-10 text-success' : g.status === 'SUBMITTED' ? 'bg-warning bg-opacity-10 text-warning' : 'bg-secondary bg-opacity-10 text-secondary';
-      return '<tr><td>' + App.escapeHtml(g.courseName || '未关联课程') + '</td><td>' + App.escapeHtml(g.assignmentTitle || '未命名作业') + '</td><td><span class="badge-soft ' + statusBadge + '">' + App.escapeHtml(statusText) + '</span></td><td>' + App.escapeHtml(g.content || '暂无提交内容') + '</td><td>' + (g.teacherScore != null ? g.teacherScore : '-') + '</td><td>' + Number(g.peerReviewBonus || 0).toFixed(1) + '</td><td><span class="fw-bold">' + (g.score != null ? g.score : '-') + '</span></td><td>' + App.escapeHtml(g.teacherComment || '暂无评语') + '</td></tr>';
-    }).join('') + '</tbody></table>' + renderPager(grades.length, gradePage, 'grades', 'goGradePage') + '</div>';
+      var score = g.score != null ? g.score : '-';
+      return '<div class="learning-grade-item">' +
+        '<div><div class="learning-grade-head"><div><div class="learning-grade-title">' + App.escapeHtml(g.assignmentTitle || '未命名作业') + '</div><div class="small text-muted mt-1">' + App.escapeHtml(g.courseName || '未关联课程') + ' · ' + App.escapeHtml(g.content || '暂无提交内容') + '</div></div><span class="badge-soft ' + statusBadge + '">' + App.escapeHtml(statusText) + '</span></div>' +
+        '<div class="learning-feedback"><i class="fa-solid fa-comment-dots me-1"></i>' + App.escapeHtml(g.teacherComment || '老师完成评语后会在这里展示。') + '</div>' +
+        '<div class="d-flex flex-wrap gap-2 mt-3"><span class="badge-soft bg-primary bg-opacity-10 text-primary">教师分 ' + (g.teacherScore != null ? g.teacherScore : '-') + '</span><span class="badge-soft bg-info bg-opacity-10 text-info">互评加分 ' + Number(g.peerReviewBonus || 0).toFixed(1) + '</span></div></div>' +
+        '<div><div class="small text-muted text-end">总分</div><div class="learning-score">' + score + '</div><button class="btn btn-outline-primary btn-sm w-100 mt-3" onclick="switchTab(\'assignments\')"><i class="fa-solid fa-file-lines me-1"></i>查看作业</button></div>' +
+      '</div>';
+    }).join('') + '</div>' + renderPager(grades.length, gradePage, 'grades', 'goGradePage');
 }
 
 function goGradePage(page) {
@@ -895,38 +968,74 @@ function goGradePage(page) {
   loadGrades();
 }
 
+function setStudentAiPrompt(text, mode) {
+  var input = document.getElementById("studentAiQuestion");
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+  if (mode && studentAiModeLabels[mode]) {
+    setStudentAiMode(mode);
+  }
+}
+
 async function loadStudentAiAgent() {
   var box = document.getElementById("studentAiBox");
   box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">课程资料、个人学习数据与校园问答</span></div><div class="text-muted small">加载中...</div>';
   try {
     studentAiCourses = await api("/student/my-courses");
+    var studentAiGrades = await api("/student/grades");
     var options = studentAiCourses.length ? studentAiCourses.map(function(c) {
       return '<option value="' + c.id + '">' + App.escapeHtml(c.name || '未命名课程') + '</option>';
     }).join('') : '<option value="">暂无课程</option>';
+    var promptButtons = [
+      { label: "解释当前课程的重点", text: "请用适合复习的方式总结这门课最近需要掌握的重点。", mode: "course_material" },
+      { label: "分析我的薄弱点", text: "请根据我的作业和成绩反馈，指出最应该优先补强的 3 个点。", mode: "learning_analysis" },
+      { label: "生成一周学习安排", text: "请把我的复习任务拆成一周计划，每天给出重点和预计用时。", mode: "teaching_advice" },
+      { label: "校园事务咨询", text: "如果我遇到课程学习或平台使用问题，应该按什么步骤处理？", mode: "campus_faq" }
+    ];
     box.innerHTML =
       '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">连续对话与个性化学习助手</span></div>' +
       '<div class="ai-workspace-grid">' +
         '<div class="section-surface">' +
-          '<label class="form-label" for="studentAiCourse">课程</label><select id="studentAiCourse" class="form-select mb-3" ' + (!studentAiCourses.length ? 'disabled' : '') + '>' + options + '</select>' +
+          '<label class="form-label" for="studentAiCourse">课程</label><select id="studentAiCourse" class="form-select mb-2" ' + (!studentAiCourses.length ? 'disabled' : '') + '>' + options + '</select>' +
+          (!studentAiCourses.length ? '<div class="small text-muted mb-3">请先在课程页完成选课，再使用课程问答和学习计划。</div>' : '<div class="small text-muted mb-3">学习计划会结合当前课程的作业、成绩、互评和薄弱点生成。</div>') +
+          '<div class="learning-ai-readiness-grid">' +
+            '<div class="learning-ai-readiness-card"><strong>' + studentAiCourses.length + '</strong><span>已选课程</span></div>' +
+            '<div class="learning-ai-readiness-card"><strong>' + studentAiGrades.length + '</strong><span>学习记录</span></div>' +
+            '<div class="learning-ai-readiness-card"><strong>' + studentAiSessions.length + '</strong><span>历史会话</span></div>' +
+          '</div>' +
           '<div id="studentAiModes" class="ai-mode-tabs" role="tablist">' +
             Object.keys(studentAiModeLabels).map(function(mode) {
               return '<button type="button" class="ai-mode-button ' + (mode === studentAiMode ? 'active' : '') + '" data-mode="' + mode + '" onclick="setStudentAiMode(\'' + mode + '\')">' + studentAiModeLabels[mode] + '</button>';
             }).join("") +
           '</div>' +
           '<label class="form-label" for="studentAiQuestion">对话内容</label><textarea id="studentAiQuestion" class="form-control mb-2" rows="3" placeholder="先选择问题分类，再输入你的问题"></textarea>' +
-          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="askStudentCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>发送</button><button class="btn btn-outline-primary btn-sm" onclick="generateStudentPlan()"><i class="fa-solid fa-calendar-check me-1"></i>生成学习计划</button><button class="btn btn-outline-secondary btn-sm" onclick="endStudentAiSession()"><i class="fa-solid fa-box-archive me-1"></i>结束对话</button></div>' +
+          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="askStudentCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>发送</button><button class="btn btn-outline-primary btn-sm" onclick="generateStudentPlan()" ' + (!studentAiCourses.length ? 'disabled' : '') + '><i class="fa-solid fa-calendar-check me-1"></i>生成学习计划</button><button class="btn btn-outline-secondary btn-sm" onclick="endStudentAiSession()"><i class="fa-solid fa-box-archive me-1"></i>结束对话</button></div>' +
           '<div id="studentAiChatHistory" class="ai-chat-history"></div>' +
         '</div>' +
         '<div class="section-surface">' +
+          '<div class="fw-semibold mb-2">建议提问</div>' +
+          '<div class="ai-prompt-grid mb-3">' + promptButtons.map(function(item) {
+            return '<button type="button" class="ai-prompt-btn" data-text="' + App.escapeAttr(item.text) + '" data-mode="' + item.mode + '" onclick="setStudentAiPrompt(this.dataset.text, this.dataset.mode)"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>' + App.escapeHtml(item.label) + '</button>';
+          }).join('') + '</div>' +
           '<div class="d-flex align-items-center justify-content-between gap-2 mb-2"><div class="fw-semibold">历史会话</div><span class="badge-soft bg-primary bg-opacity-10 text-primary">本机保存</span></div>' +
           '<div class="small text-muted mb-3">结束当前对话后，会话包会保存到这里，后续可以打开继续查看，也可以下载 JSON 备份。</div>' +
+          '<div class="ai-readiness mb-3">' +
+            '<div class="fw-semibold mb-2">使用前检查</div>' +
+            '<ul class="ai-readiness-list">' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>课程资料问答依赖教师端完成资料上传和索引。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>学习计划依赖作业提交、成绩反馈和互评记录。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>没有历史数据时，AI 会优先给出通用学习建议。</span></li>' +
+            '</ul>' +
+          '</div>' +
           '<div id="studentAiSessionList" class="ai-session-list"></div>' +
         '</div>' +
       '</div>';
     renderStudentAiChat();
     renderStudentAiSessions();
   } catch (err) {
-    box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false);
+    box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false, '重新加载', 'loadStudentAiAgent()', 'fa-rotate');
   }
 }
 

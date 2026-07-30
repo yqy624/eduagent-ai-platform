@@ -109,6 +109,8 @@ class GradeTools:
             "id": sub.id,
             "assignment_id": sub.assignment_id,
             "content": sub.content,
+            "file_name": sub.file_name,
+            "file_paths": sub.file_paths,
             "score": sub.score,
             "status": sub.status,
             "teacher_comment": sub.teacher_comment,

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.database import async_session_factory
 from app.models.models import Submission, Assignment
 from app.models.ai_models import AiEvalResult
-from ai.tools.grade_tools import GradeTools
+from ai.workflows.grading_graph import analyze_submission_for_grading
 
 
 async def run_grading_eval():
@@ -21,8 +21,6 @@ async def run_grading_eval():
     print("=" * 60)
 
     async with async_session_factory() as db:
-        grade_tools = GradeTools(db)
-
         # 获取已有评分的提交
         result = await db.execute(
             select(Submission).where(
@@ -45,21 +43,28 @@ async def run_grading_eval():
             )
             assignment_obj = assignment.scalar_one_or_none()
 
-            # 模拟 AI 评分（基于规则的估算）
-            content_len = len(sub.content or "")
             total_points = assignment_obj.total_points if assignment_obj else 100
 
-            # 规则评分
-            if content_len > 500:
-                ai_score = total_points * 0.85
-            elif content_len > 200:
-                ai_score = total_points * 0.75
-            elif content_len > 50:
-                ai_score = total_points * 0.60
-            else:
-                ai_score = total_points * 0.40
-
-            ai_score = min(total_points, max(0, ai_score))
+            analysis = analyze_submission_for_grading(
+                {
+                    "id": sub.id,
+                    "assignment_id": sub.assignment_id,
+                    "content": sub.content,
+                    "file_name": sub.file_name,
+                    "file_paths": sub.file_paths,
+                    "score": sub.score,
+                    "status": sub.status,
+                },
+                {
+                    "id": assignment_obj.id if assignment_obj else None,
+                    "title": assignment_obj.title if assignment_obj else None,
+                    "description": assignment_obj.description if assignment_obj else None,
+                    "detail": assignment_obj.detail if assignment_obj else None,
+                    "total_points": total_points,
+                },
+                [],
+            )
+            ai_score = analysis["score"]
             teacher_score = sub.score
 
             error = abs(ai_score - teacher_score)

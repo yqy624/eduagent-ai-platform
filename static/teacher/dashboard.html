@@ -6,8 +6,8 @@
   <title>教师工作台</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
-  <script src="/static/js/echarts.min.js?v=20260705"></script>
-  <link href="/static/css/app.css?v=20260705" rel="stylesheet">
+  <script src="/static/js/echarts.min.js?v=20260730"></script>
+  <link href="/static/css/app.css?v=20260730" rel="stylesheet">
   <style>
     .global-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .global-overview-item{border:1px solid var(--border);border-radius:14px;background:var(--bg-soft);padding:14px;min-height:96px}
@@ -30,6 +30,13 @@
     .ai-chat-message.assistant .ai-chat-bubble{background:var(--bg-soft)}
     .ai-chat-meta{font-size:11px;color:var(--text-muted)}
     .ai-chat-citations{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px}
+    .teacher-ai-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+    .teacher-ai-status-card{border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);padding:12px}
+    .teacher-ai-status-card strong{display:block;color:var(--text-main);font-size:18px;line-height:1.1}
+    .teacher-ai-status-card span{display:block;color:var(--text-muted);font-size:12px;margin-top:5px}
+    .ai-prompt-grid{display:grid;gap:8px}
+    .ai-prompt-btn{width:100%;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);color:var(--text-main);padding:10px 12px;text-align:left;font-size:13px;line-height:1.45}
+    .ai-prompt-btn:hover{border-color:var(--accent);color:var(--accent)}
     @media (max-width: 992px){.ai-workspace-grid{grid-template-columns:1fr}}
     @media (max-width: 576px){.global-overview-grid{grid-template-columns:1fr}.global-next-action{align-items:flex-start;flex-direction:column}}
   </style>
@@ -80,6 +87,22 @@
         <div class="eyebrow"><i class="fa-solid fa-chalkboard-user"></i> 教师工作台</div>
         <div class="title">欢迎回来，<span id="heroName">教师</span></div>
         <div class="desc">管理课程与作业，开放匿名互评，查看学生参与情况和成绩分析。</div>
+      </div>
+      <div class="workflow-guide mb-3" aria-label="教师演示流程">
+        <div class="workflow-guide-head">
+          <div>
+            <div class="workflow-guide-kicker">开源演示路径</div>
+            <div class="workflow-guide-title">课程、作业、RAG 索引、AI 批改和成绩分析形成教学闭环。</div>
+          </div>
+          <span class="workflow-guide-badge">Teacher Flow</span>
+        </div>
+        <div class="workflow-steps">
+          <div class="workflow-step"><span>1</span><strong>新建课程</strong><small>设置课程目标、时间和容量。</small></div>
+          <div class="workflow-step"><span>2</span><strong>发布作业</strong><small>作业详情会参与课程知识库索引。</small></div>
+          <div class="workflow-step"><span>3</span><strong>索引课程资料</strong><small>上传材料后让 AI 基于课程内容回答。</small></div>
+          <div class="workflow-step"><span>4</span><strong>AI 辅助批改</strong><small>教师审核建议后再写回成绩。</small></div>
+          <div class="workflow-step"><span>5</span><strong>查看成绩分析</strong><small>用分布和及格率复盘教学效果。</small></div>
+        </div>
       </div>
       <div class="kpi-grid mb-3" id="kpiGrid"></div>
       <div class="row g-3 align-items-stretch">
@@ -240,10 +263,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="/static/js/app.js?v=20260705"></script>
+<script src="/static/js/app.js?v=20260730"></script>
 <script>
 window.TOKEN = new URLSearchParams(location.search).get("token") || localStorage.getItem("token") || "";
-if (!TOKEN) location.href = "/login.html";
+if (!TOKEN) location.href = "/";
 App.initTheme();
 App.initNotifications(TOKEN);
 App.setBreadcrumb(["教师工作台", "概览"]);
@@ -392,8 +415,11 @@ function handleKpiKey(event, tab) {
   }
 }
 
-function renderEmptyPanel(title, desc, compact) {
-  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div></div></div>';
+function renderEmptyPanel(title, desc, compact, actionLabel, actionHandler, icon) {
+  var action = actionLabel && actionHandler
+    ? '<div class="empty-panel-actions"><button class="btn btn-primary btn-sm" type="button" onclick="' + actionHandler + '"><i class="fa-solid ' + (icon || 'fa-arrow-right') + ' me-1"></i>' + App.escapeHtml(actionLabel) + '</button></div>'
+    : '';
+  return '<div class="empty-panel ' + (compact ? 'compact' : '') + '"><div class="empty-panel-copy"><div class="empty-panel-title">' + App.escapeHtml(title) + '</div><div class="empty-panel-desc">' + App.escapeHtml(desc) + '</div>' + action + '</div></div>';
 }
 
 function dashboardField(data, camelKey, snakeKey, fallback) {
@@ -532,7 +558,7 @@ async function loadCourses() {
   teacherCourses = courses;
   var html = '<div class="section-head"><h5 class="mb-0">课程管理</h5><button class="btn btn-primary btn-sm" onclick="openCourseModal()">新建课程</button></div>';
   if (!courses.length) {
-    document.getElementById("courseBox").innerHTML = html + renderEmptyPanel('暂无课程', '先创建课程，再安排学生和作业内容。', false);
+    document.getElementById("courseBox").innerHTML = html + renderEmptyPanel('暂无课程', '先创建课程，再安排学生和作业内容。', false, '新建课程', 'openCourseModal()', 'fa-book-medical');
     syncAssignmentCourseOptions();
     return;
   }
@@ -598,7 +624,7 @@ async function loadStudents() {
     var c = courses[ci];
     var students = await api("/teacher/courses/" + c.id + "/students");
     if (!students.length) {
-      html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6>' + renderEmptyPanel('暂无选课学生', '该课程目前还没有学生加入。', true) + '</div>';
+      html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6>' + renderEmptyPanel('暂无选课学生', '该课程目前还没有学生加入。可让学生端先完成选课，或联系管理员调整选课名单。', true, '查看课程', "switchTab('courses')", 'fa-book') + '</div>';
       continue;
     }
     hasStudents = true;
@@ -608,7 +634,7 @@ async function loadStudents() {
     });
     html += '</tbody></table></div>';
   }
-  document.getElementById("studentBox").innerHTML = courses.length ? html : renderEmptyPanel('暂无课程数据', '创建课程后可在这里查看学生名单。', false);
+  document.getElementById("studentBox").innerHTML = courses.length ? html : renderEmptyPanel('暂无课程数据', '创建课程后可在这里查看学生名单。', false, '新建课程', 'openCourseModal()', 'fa-book-medical');
 }
 
 async function loadAssignments() {
@@ -623,7 +649,7 @@ async function loadAssignments() {
     var list = await api("/teacher/courses/" + c.id + "/assignments");
     list.forEach(function(a) { teacherAssignments.push(a); });
     if (!list.length) {
-      html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6>' + renderEmptyPanel('暂无作业', '这门课程还没有发布作业，可直接从上方创建。', true) + '</div>';
+      html += '<div class="table-wrap mb-3"><h6 class="mb-3"><i class="fa-solid fa-book me-2" style="color:var(--accent)"></i>' + App.escapeHtml(c.name || '未命名课程') + '</h6>' + renderEmptyPanel('暂无作业', '这门课程还没有发布作业，可直接从上方创建。', true, '发布作业', 'openAssignmentModal()', 'fa-file-circle-plus') + '</div>';
       continue;
     }
     hasData = true;
@@ -635,7 +661,7 @@ async function loadAssignments() {
     });
     html += '</tbody></table></div>';
   }
-  document.getElementById("assignmentBox").innerHTML = courses.length ? html : renderEmptyPanel('暂无课程可发布作业', '请先创建课程，再为课程发布作业。', false);
+  document.getElementById("assignmentBox").innerHTML = courses.length ? html : renderEmptyPanel('暂无课程可发布作业', '请先创建课程，再为课程发布作业。', false, '新建课程', 'openCourseModal()', 'fa-book-medical');
 }
 
 function openAssignmentModal(id) {
@@ -715,7 +741,7 @@ async function loadPeerReviewManage() {
     }
     html += '</tbody></table></div>';
   }
-  document.getElementById('peerReviewManageBox').innerHTML = hasData ? html : '<div class="text-muted text-center py-5">请先发布作业，再配置互评</div>';
+  document.getElementById('peerReviewManageBox').innerHTML = hasData ? html : renderEmptyPanel('暂无互评配置', '请先发布作业，再配置匿名互评规则。', false, '发布作业', 'openAssignmentModal()', 'fa-file-circle-plus');
 }
 
 async function openPeerConfig(assignmentId, title) {
@@ -785,7 +811,7 @@ async function loadGrading() {
       html += '</tbody></table></div>';
     }
   }
-  document.getElementById("gradingBox").innerHTML = hasGrading ? html : renderEmptyPanel('暂无待评分作业', '学生提交后，会在这里集中展示评分任务。', false);
+  document.getElementById("gradingBox").innerHTML = hasGrading ? html : renderEmptyPanel('暂无待评分作业', '学生提交后，会在这里集中展示评分任务。', false, '查看作业', "switchTab('assignments')", 'fa-file-lines');
 }
 
 async function loadQuickComments(category) {
@@ -885,7 +911,7 @@ async function loadAnalysis() {
       html += '<div class="section-surface mb-3 analysis-card"><div class="d-flex justify-content-between align-items-start gap-2 mb-2"><h6 class="mb-0"><i class="fa-solid fa-chart-bar me-2" style="color:var(--accent)"></i>' + App.escapeHtml(a.title || '未命名作业') + '</h6><span class="badge-soft bg-primary bg-opacity-10 text-primary">平均分 ' + (d.average != null ? Number(d.average).toFixed(1) : '-') + '</span></div><div class="metric-row mb-2"><span>提交 ' + (d.total || 0) + '</span><span>最高 ' + (d.max != null ? d.max : '-') + '</span><span>及格率 ' + (d.passRate != null ? d.passRate : 0) + '%</span></div><div id="' + aid + '" style="height:260px"></div></div>';
     }
   }
-  document.getElementById("analysisBox").innerHTML = charts.length ? html : html + renderEmptyPanel('暂无分析数据', '学生提交并评分后，这里会展示成绩分布与趋势。', false);
+  document.getElementById("analysisBox").innerHTML = charts.length ? html : html + renderEmptyPanel('暂无分析数据', '学生提交并评分后，这里会展示成绩分布与趋势。', false, '去评分', "switchTab('grading')", 'fa-pen-nib');
   charts.forEach(function(item) {
     var el = document.getElementById(item.id);
     if (!el || !hasEcharts()) return;
@@ -901,6 +927,17 @@ async function loadAnalysis() {
   });
 }
 
+function setTeacherAiPrompt(text, mode) {
+  var input = document.getElementById("teacherAiQuestion");
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+  if (mode && teacherAiModeLabels[mode]) {
+    setTeacherAiMode(mode);
+  }
+}
+
 async function loadTeacherAiAgent() {
   var box = document.getElementById("teacherAiBox");
   box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">知识库索引、教学数据与校园问答</span></div><div class="text-muted small">加载中...</div>';
@@ -909,12 +946,24 @@ async function loadTeacherAiAgent() {
     var options = courses.length ? courses.map(function(c) {
       return '<option value="' + c.id + '">' + App.escapeHtml(c.name || '未命名课程') + '</option>';
     }).join('') : '<option value="">暂无课程</option>';
+    var promptButtons = [
+      { label: "课程资料问答", text: "请根据当前课程资料，提炼这节课最适合考试复习的 5 个知识点。", mode: "course_material" },
+      { label: "教学数据诊断", text: "请结合学生提交、互评和成绩数据，指出这门课目前最需要关注的问题。", mode: "learning_analysis" },
+      { label: "生成教学建议", text: "请给我一份下周教学调整建议，包含课堂讲解、作业和学生跟进。", mode: "teaching_advice" },
+      { label: "平台操作咨询", text: "如果我要完成课程资料索引、发布作业和 AI 辅助批改，应该按什么顺序操作？", mode: "campus_faq" }
+    ];
     box.innerHTML =
       '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">连续对话与个性化教学助手</span></div>' +
       '<div class="ai-workspace-grid">' +
         '<div class="section-surface">' +
-          '<label class="form-label" for="teacherAiCourse">课程</label><select id="teacherAiCourse" class="form-select mb-3" ' + (!courses.length ? 'disabled' : '') + '>' + options + '</select>' +
-          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="indexTeacherCourseDocs()"><i class="fa-solid fa-database me-1"></i>索引课程资料</button></div>' +
+          '<label class="form-label" for="teacherAiCourse">课程</label><select id="teacherAiCourse" class="form-select mb-2" ' + (!courses.length ? 'disabled' : '') + '>' + options + '</select>' +
+          (!courses.length ? '<div class="small text-muted mb-3">请先在课程管理中创建课程，再使用课程资料问答和索引能力。</div>' : '<div class="small text-muted mb-3">先上传课程材料或发布作业详情，再建立索引，问答结果会更稳定。</div>') +
+          '<div class="teacher-ai-status-grid">' +
+            '<div class="teacher-ai-status-card"><strong>' + courses.length + '</strong><span>可用课程</span></div>' +
+            '<div class="teacher-ai-status-card"><strong>' + teacherAiMessages.length + '</strong><span>当前对话消息</span></div>' +
+            '<div class="teacher-ai-status-card"><strong>' + (courses.length ? '可执行' : '待建课') + '</strong><span>资料索引状态</span></div>' +
+          '</div>' +
+          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="indexTeacherCourseDocs()" ' + (!courses.length ? 'disabled' : '') + '><i class="fa-solid fa-database me-1"></i>索引课程资料</button></div>' +
           '<div id="teacherAiModes" class="ai-mode-tabs" role="tablist">' +
             Object.keys(teacherAiModeLabels).map(function(mode) {
               return '<button type="button" class="ai-mode-button ' + (mode === teacherAiMode ? 'active' : '') + '" data-mode="' + mode + '" onclick="setTeacherAiMode(\'' + mode + '\')">' + teacherAiModeLabels[mode] + '</button>';
@@ -927,11 +976,23 @@ async function loadTeacherAiAgent() {
         '<div class="section-surface">' +
           '<div class="fw-semibold mb-2">当前对话</div>' +
           '<div class="small text-muted">分类会直接决定助手使用的回答范围；历史对话会用于理解课程教学目标和你的工作偏好。</div>' +
+          '<div class="fw-semibold mt-3 mb-2">建议提问</div>' +
+          '<div class="ai-prompt-grid mb-3">' + promptButtons.map(function(item) {
+            return '<button type="button" class="ai-prompt-btn" data-text="' + App.escapeAttr(item.text) + '" data-mode="' + item.mode + '" onclick="setTeacherAiPrompt(this.dataset.text, this.dataset.mode)"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>' + App.escapeHtml(item.label) + '</button>';
+          }).join('') + '</div>' +
+          '<div class="ai-readiness">' +
+            '<div class="fw-semibold mb-2">使用前检查</div>' +
+            '<ul class="ai-readiness-list">' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>课程资料类问题：先选择课程并执行“索引课程资料”。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>教学数据类问题：先让学生完成提交、互评或评分，回答会包含业务数据。</span></li>' +
+              '<li><i class="fa-solid fa-circle-check"></i><span>AI 批改建议：从“评分”页打开学生提交，再生成建议并由教师确认。</span></li>' +
+            '</ul>' +
+          '</div>' +
         '</div>' +
       '</div>';
     renderTeacherAiChat();
   } catch (err) {
-    box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false);
+    box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false, '重新加载', 'loadTeacherAiAgent()', 'fa-rotate');
   }
 }
 
@@ -1003,7 +1064,32 @@ function renderGradeSuggestion(data) {
   var strengths = data.strengths || [];
   var weaknesses = data.weaknesses || [];
   var risks = data.risks || [];
+  var analysis = data.analysis || {};
+  var componentScores = analysis.componentScores || analysis.component_scores || {};
+  var metricLabels = {
+    requirements: '要求覆盖',
+    depth: '内容深度',
+    structure: '结构层次',
+    evidence: '证据支撑',
+    expression: '表达规范'
+  };
+  var metrics = Object.keys(metricLabels).map(function(key) {
+    if (componentScores[key] == null) return '';
+    return '<div class="badge-soft bg-primary bg-opacity-10 text-primary me-1 mb-1">' + metricLabels[key] + ' ' + Math.round(Number(componentScores[key]) * 100) + '%</div>';
+  }).join('');
+  var matched = analysis.matchedKeywords || analysis.matched_keywords || [];
+  var missing = analysis.missingKeywords || analysis.missing_keywords || [];
+  var keywordLine = '';
+  if (matched.length || missing.length) {
+    keywordLine = '<div class="mt-2 small text-muted">' +
+      (matched.length ? '已覆盖：' + matched.map(App.escapeHtml).join('、') : '') +
+      (matched.length && missing.length ? '；' : '') +
+      (missing.length ? '待补充：' + missing.slice(0, 4).map(App.escapeHtml).join('、') : '') +
+      '</div>';
+  }
   return '<div><span class="fw-semibold">建议分数：</span>' + (data.suggestedScore != null ? data.suggestedScore : data.suggested_score || '-') + '</div>' +
+    (metrics ? '<div class="mt-2">' + metrics + '</div>' : '') +
+    keywordLine +
     '<div class="mt-1" style="white-space:pre-wrap">' + App.escapeHtml(data.comment || '') + '</div>' +
     (strengths.length ? '<div class="mt-2 text-success">优点：' + strengths.map(App.escapeHtml).join('；') + '</div>' : '') +
     (weaknesses.length ? '<div class="mt-1 text-warning">改进：' + weaknesses.map(App.escapeHtml).join('；') + '</div>' : '') +

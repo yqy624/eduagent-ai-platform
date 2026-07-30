@@ -244,7 +244,7 @@ a { color: var(--accent); }
 }
 
 .auth-card {
-  width: min(980px, 100%);
+  width: min(1160px, 100%);
   overflow: hidden;
   border-radius: 22px;
   position: relative;
@@ -268,6 +268,10 @@ a { color: var(--accent); }
   color: #fff;
   padding: 44px;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
 }
 
 .auth-hero::before {
@@ -281,6 +285,83 @@ a { color: var(--accent); }
 
 .auth-hero > * { position: relative; z-index: 1; }
 .auth-body { padding: 44px; position: relative; }
+
+.auth-hero-content {
+  display: grid;
+  gap: 18px;
+}
+
+.auth-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.13);
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.86);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auth-title {
+  max-width: 560px;
+  margin: 0;
+  font-size: 38px;
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.auth-lead {
+  max-width: 620px;
+  margin: 0;
+  color: rgba(255,255,255,.76);
+  line-height: 1.72;
+}
+
+.advantage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.advantage-item {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  padding: 14px;
+  min-height: 128px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.11);
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+.advantage-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255,255,255,.16);
+  color: #fff;
+  font-size: 17px;
+}
+
+.advantage-title {
+  font-weight: 800;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.advantage-desc {
+  margin-top: 6px;
+  color: rgba(255,255,255,.68);
+  font-size: 13px;
+  line-height: 1.58;
+}
 
 .brand-mark {
   width: 58px;
@@ -661,6 +742,14 @@ body[data-role="student"] .role-identity-marker {
   line-height: 1.6;
 }
 
+.empty-panel-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .dashboard-card-fill {
   min-height: 320px;
   display: flex;
@@ -675,6 +764,128 @@ body[data-role="student"] .role-identity-marker {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+}
+
+.workflow-guide {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 44%),
+    linear-gradient(145deg, var(--card-grad-from), var(--card-grad-to));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.workflow-guide-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.workflow-guide-kicker {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.workflow-guide-title {
+  color: var(--text);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.workflow-guide-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.workflow-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 104px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+}
+
+.workflow-step span {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+}
+
+.workflow-step strong {
+  display: block;
+  min-width: 0;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.workflow-step small {
+  display: block;
+  grid-column: 2;
+  min-width: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-top: 4px;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.ai-readiness {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-readiness-list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-readiness-list li {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ai-readiness-list i {
+  color: var(--accent);
+  margin-top: 3px;
 }
 
 .metric-muted {
@@ -1309,7 +1520,10 @@ body[data-role="student"] .role-identity-marker {
 
 @media (max-width: 768px) {
   .auth-body, .auth-hero { padding: 24px; }
+  .auth-title { font-size: 30px; }
+  .advantage-grid,
   .hero-mini { grid-template-columns: 1fr; }
+  .advantage-item { min-height: 0; }
   .notif-panel { width: min(320px, calc(100vw - 24px)); }
   .topbar-role-slot { justify-content: flex-start; }
   .role-identity-marker {

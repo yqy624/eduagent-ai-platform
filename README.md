@@ -3,6 +3,22 @@
 > 在原有智慧教育管理系统基础上，将 Java 后端迁移为 Python FastAPI，并引入 LangGraph 多 Agent 工作流，
 > 从「记录课程、作业、成绩」升级为「基于课程资料和学习行为进行诊断、答疑、规划、批改和教学建议生成」。
 
+## 项目定位
+
+EduAgent 当前定位为 **AI 教育平台 Preview / MVP**：它已经具备可演示的三角色工作台、课程与作业管理、学生学习任务、匿名互评、AI 学情诊断、课程资料问答和教师 AI 辅助批改闭环。
+
+本项目适合用于开源展示、课程设计、毕业设计原型和 AI 教育产品 MVP 验证。当前版本不建议直接包装为完整生产级教育平台，生产环境仍需要补齐权限审计、密钥管理、文件安全、测试覆盖、监控告警和部署方案。
+
+## 页面预览
+
+| 登录入口 | 管理员工作台 |
+| --- | --- |
+| ![登录入口](docs/screenshots/login.png) | ![管理员工作台](docs/screenshots/admin-dashboard.png) |
+
+| 教师工作台 | 学生工作台 |
+| --- | --- |
+| ![教师工作台](docs/screenshots/teacher-dashboard.png) | ![学生工作台](docs/screenshots/student-dashboard.png) |
+
 ## 架构图
 
 ![EduAgent 架构图](static/architecture.svg)
@@ -39,14 +55,14 @@
 
 ## 当前基线状态
 
-项目已经具备 FastAPI、三角色业务接口和 AI 工作流骨架，但尚未完成全部需求验收。
-当前阶段先保证编码、依赖、配置和启动入口可审计，再继续修复业务接口和 AI 闭环。
+项目已经具备 FastAPI、三角色业务接口、静态前端工作台和 AI 工作流骨架。登录入口已统一，三端均提供演示路径和新用户引导；教师端 AI 批改已从简单长度规则升级为基于作业要求、提交内容、互评和附件状态的本地内容感知建议。
 
 已知限制：
 
-- 完整运行需要 MySQL、Redis 和至少一个可用的 LLM 或本地 Ollama。
+- 完整运行需要 MySQL、Redis；部分 AI 能力需要至少一个可用的 LLM 或本地 Ollama。
 - `python scripts/check_baseline.py` 会区分代码错误、核心依赖缺失和可选 AI 依赖缺失。
-- RAG、学习计划 Agent、批改 Agent、通知和部分管理员接口仍在后续阶段完善。
+- 教师 AI 辅助批改当前默认提供稳定的本地内容感知建议，不等同于真实 LLM 自动阅卷。
+- RAG、学习计划 Agent、教学建议和部分数据分析能力仍适合作为 Preview/MVP 能力继续迭代。
 
 ## 快速启动
 

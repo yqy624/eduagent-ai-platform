@@ -1252,6 +1252,7 @@ async def grade_suggestion(
             "strengths": None,
             "weaknesses": None,
             "risks": None,
+            "grading_analysis": None,
             "suggestion_id": None,
             "teacher_action": None,
             "teacher_score": None,
@@ -1280,6 +1281,7 @@ async def grade_suggestion(
             strengths=result.get("strengths", []),
             weaknesses=result.get("weaknesses", []),
             risks=result.get("risks", []),
+            analysis=result.get("grading_analysis", {}),
         ))
 
     except Exception as e:

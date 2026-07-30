@@ -298,7 +298,7 @@ window.App = (function () {
     localStorage.removeItem("displayName");
     localStorage.removeItem("username");
     if (ws) { ws.close(); ws = null; }
-    window.location.href = "/login.html";
+    window.location.href = "/";
   }
 
   function showToast(message, type) {

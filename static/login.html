@@ -3,21 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>教育管理系统 - 登录</title>
+  <title>EduAgent 智慧教育平台 - 登录</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
-  <link href="/static/css/app.css?v=20240630" rel="stylesheet">
+  <link href="/static/css/app.css?v=20260730" rel="stylesheet">
 </head>
 <body class="auth-shell">
   <div class="auth-card row g-0">
-    <div class="col-lg-5 auth-hero">
-      <div class="brand-mark mb-4"><i class="fa-solid fa-graduation-cap fs-2"></i></div>
-      <h1 class="h2 fw-bold mb-3">教育管理系统</h1>
-      <p class="mb-4 text-white-50">管理员、教师、学生统一登录入口，登录后按角色跳转到对应工作台。</p>
-      <div class="hero-mini">
-        <div class="mini"><div class="fw-semibold"><i class="fa-solid fa-layer-group me-1"></i>多角色</div><div class="small text-white-50 mt-1">一站式工作台</div></div>
-        <div class="mini"><div class="fw-semibold"><i class="fa-solid fa-bell me-1"></i>实时通知</div><div class="small text-white-50 mt-1">消息及时触达</div></div>
-        <div class="mini"><div class="fw-semibold"><i class="fa-solid fa-chart-pie me-1"></i>数据分析</div><div class="small text-white-50 mt-1">成绩趋势可视化</div></div>
+    <div class="col-lg-7 auth-hero">
+      <div class="auth-hero-content">
+        <div class="brand-mark mb-4"><i class="fa-solid fa-graduation-cap fs-2"></i></div>
+        <div class="auth-eyebrow"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Preview / MVP · AI 教育平台</div>
+        <h1 class="auth-title">EduAgent 智慧教育平台</h1>
+        <p class="auth-lead">把课程、作业、成绩、资料和 AI Agent 放在同一个工作流里，让管理员看全局、教师提效率、学生拿到个性化学习支持。</p>
+
+        <div class="advantage-grid">
+          <div class="advantage-item">
+            <div class="advantage-icon"><i class="fa-solid fa-comments"></i></div>
+            <div>
+              <div class="advantage-title">课程 RAG 助教</div>
+              <div class="advantage-desc">基于课程资料、作业附件和讲义答疑，回答带来源，更适合教学场景。</div>
+            </div>
+          </div>
+          <div class="advantage-item">
+            <div class="advantage-icon"><i class="fa-solid fa-route"></i></div>
+            <div>
+              <div class="advantage-title">学情诊断与路径规划</div>
+              <div class="advantage-desc">读取成绩、提交和互评记录，识别薄弱点并生成一周学习计划。</div>
+            </div>
+          </div>
+          <div class="advantage-item">
+            <div class="advantage-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+            <div>
+              <div class="advantage-title">教师 AI 批改建议</div>
+              <div class="advantage-desc">AI 给出建议分数和评语，教师确认后写回，保留人工把关。</div>
+            </div>
+          </div>
+          <div class="advantage-item">
+            <div class="advantage-icon"><i class="fa-solid fa-users-gear"></i></div>
+            <div>
+              <div class="advantage-title">三角色协同工作台</div>
+              <div class="advantage-desc">管理员、教师、学生统一入口登录，按角色进入对应的数据与任务界面。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-mini">
+          <div class="mini"><div class="fw-semibold"><i class="fa-solid fa-bolt me-1"></i>FastAPI 异步架构</div><div class="small text-white-50 mt-1">接口清晰，易扩展</div></div>
+          <div class="mini"><div class="fw-semibold"><i class="fa-solid fa-diagram-project me-1"></i>LangGraph 编排</div><div class="small text-white-50 mt-1">多 Agent 流程可追踪</div></div>
+          <div class="mini"><div class="fw-semibold"><i class="fa-solid fa-bell me-1"></i>实时通知</div><div class="small text-white-50 mt-1">任务动态及时触达</div></div>
+        </div>
       </div>
       <div class="d-flex flex-wrap gap-2 mt-4">
         <button class="btn btn-outline-light btn-sm" onclick="fillDemo('admin','admin123','ADMIN')">管理员</button>
@@ -25,11 +60,11 @@
         <button class="btn btn-outline-light btn-sm" onclick="fillDemo('student1','student123','STUDENT')">学生</button>
       </div>
     </div>
-    <div class="col-lg-7 auth-body">
+    <div class="col-lg-5 auth-body">
       <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
-          <h2 class="h4 fw-bold mb-1">欢迎回来</h2>
-          <div class="text-muted">请使用账号、密码和角色登录</div>
+          <h2 class="h4 fw-bold mb-1">登录工作台</h2>
+          <div class="text-muted">选择身份后进入对应教学场景</div>
         </div>
       </div>
       <div class="mb-3">

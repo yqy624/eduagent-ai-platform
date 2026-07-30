@@ -116,6 +116,12 @@ async def root():
     return FileResponse(_os.path.join(_static_dir, "login.html"))
 
 
+@app.get("/login.html", include_in_schema=False)
+async def login_page():
+    from fastapi.responses import FileResponse
+    return FileResponse(_os.path.join(_static_dir, "login.html"))
+
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "version": "2.0.0", "project": "EduAgent", "ai_available": AI_AVAILABLE}
