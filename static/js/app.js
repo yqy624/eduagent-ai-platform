@@ -314,6 +314,12 @@ window.App = (function () {
     toast.show();
   }
 
+  window.toggleSidebar = function() {
+    var sb = document.querySelector(".sidebar");
+    if (!sb) return;
+    sb.classList.toggle("sidebar-open");
+  };
+
   return {
     initTheme: initTheme,
     initRoleIdentityMarker: initRoleIdentityMarker,

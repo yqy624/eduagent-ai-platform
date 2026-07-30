@@ -1513,9 +1513,12 @@ body[data-role="student"] .role-identity-marker {
 
 @media (max-width: 992px) {
   .dashboard-shell { grid-template-columns: 1fr; }
-  .sidebar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 14px; width: 100%; height: auto; }
-  .sidebar::before { display: none; }
-  .sidebar .nav-item { padding: 8px 12px; font-size: 13px; border-radius: 10px; white-space: nowrap; }
+  .sidebar { position: fixed; top: 0; left: -280px; width: 272px; height: 100vh; z-index: 1050; display: flex; flex-direction: column; padding: 20px 16px; transition: left .25s ease; }
+  .sidebar.sidebar-open { left: 0; }
+  .sidebar::before { display: block; }
+  .sidebar .nav-item { padding: 13px 14px; font-size: 14px; border-radius: 14px; }
+  .sidebar ~ .main-area::after { content: ""; display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1049; }
+  .sidebar.sidebar-open ~ .main-area::after { display: block; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .overview-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
@@ -1551,7 +1554,8 @@ body[data-role="student"] .role-identity-marker {
   .modal-content { border-radius: 12px; }
   .modal-body { padding: 16px; }
   .topbar { padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
-  .form-control, .form-select { font-size: 16px; } /* iOS 防止自动缩放 */
+  .topbar .btn { font-size: 13px; padding: 5px 10px; }
+  .form-control, .form-select { font-size: 16px; }
 }
 
 .metric-row {
@@ -1680,10 +1684,6 @@ body[data-role="student"] .role-identity-marker {
   .kpi .value { font-size: 22px; }
   .kpi-card { padding: 12px; }
   .kpi-card .kpi-value { font-size: 18px; }
-
-  /* 侧边栏紧凑导航 */
-  .sidebar { padding: 8px 10px; gap: 3px; }
-  .sidebar .nav-item { padding: 7px 10px; font-size: 12px; gap: 6px; border-radius: 8px; }
 
   /* 顶部栏紧凑 */
   .topbar { padding: 8px 12px; }
