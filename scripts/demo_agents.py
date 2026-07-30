@@ -25,11 +25,11 @@ print("🤖 演示: EduAgent 三个 AI 闭环")
 print("=" * 60)
 
 # 1. 登录
-admin = req("POST", "/api/auth/login", {"username": "admin", "password": "admin123", "role": "ADMIN"})
+admin = req("POST", "/api/auth/login", {"username": "yadmin", "password": "yadmin666", "role": "ADMIN"})
 adm_tok = admin["data"]["token"]
 print(f"\n✅ 管理员登录成功")
 
-teacher = req("POST", "/api/auth/login", {"username": "teacher1", "password": "teacher123", "role": "TEACHER"})
+teacher = req("POST", "/api/auth/login", {"username": "yteacher1", "password": "yteacher666", "role": "TEACHER"})
 tch_tok = teacher["data"]["token"]
 print(f"✅ 教师登录成功")
 

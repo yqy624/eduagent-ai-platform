@@ -15,8 +15,8 @@ from sqlalchemy import select
 
 async def check():
     async with async_session_factory() as db:
-        t = (await db.execute(select(User).where(User.username == "teacher1"))).scalar_one()
-        print(f"Teacher1: id={t.id}, display={t.display_name}")
+        t = (await db.execute(select(User).where(User.username == "yteacher1"))).scalar_one()
+        print(f"Teacher: id={t.id}, display={t.display_name}")
         
         courses = (await db.execute(select(Course))).scalars().all()
         print(f"\nAll courses:")

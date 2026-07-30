@@ -4,7 +4,7 @@ EduAgent 一键演示脚本 — 展示所有核心功能
 用法: .venv/Scripts/python scripts/run_demo.py
 
 该脚本自动演示：
-1. 种子数据初始化
+1. 健康检查
 2. 课程文档索引
 3. 三种角色登录
 4. 课程 RAG 问答
@@ -96,9 +96,9 @@ async def main():
     print("📌 [Step 2/7] 三种角色登录")
     print("─" * 60)
     
-    admin = client.login("admin", "admin123", "ADMIN")
-    teacher = client.login("teacher1", "teacher123", "TEACHER")
-    student = client.login("student1", "student123", "STUDENT")
+    admin = client.login("yadmin", "yadmin666", "ADMIN")
+    teacher = client.login("yteacher1", "yteacher666", "TEACHER")
+    student = client.login("ystudent1", "ystudent666", "STUDENT")
 
     if admin:
         print(f"  ✅ 管理员: {admin['displayName']} → {admin['redirectUrl']}")
@@ -189,11 +189,6 @@ async def main():
     print("\n" + "=" * 60)
     print("  🎉 EduAgent 演示完成！")
     print("=" * 60)
-    print()
-    print("  演示账号:")
-    print("    管理员: admin / admin123")
-    print("    教师:   teacher1 / teacher123")
-    print("    学生:   student1 / student123")
     print()
     print("  核心功能:")
     print("    ✅ 认证与角色权限 (RBAC)")

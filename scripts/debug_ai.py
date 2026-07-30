@@ -19,7 +19,7 @@ def req(method, path, body=None, token=None):
         return {"raw": data, "status": resp.status}
 
 # Login
-admin = req("POST", "/api/auth/login", {"username":"admin","password":"admin123","role":"ADMIN"})
+admin = req("POST", "/api/auth/login", {"username":"yadmin","password":"yadmin666","role":"ADMIN"})
 tok = admin.get("data", {}).get("token", "")
 print(f"Login: {admin.get('code')}")
 print(f"Token OK: {bool(tok)}")

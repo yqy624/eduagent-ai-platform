@@ -12,7 +12,7 @@ def req(method, path, body=None, token=None):
     return d
 
 # Login
-a = req("POST", "/api/auth/login", {"username":"admin","password":"admin123","role":"ADMIN"})
+a = req("POST", "/api/auth/login", {"username":"yadmin","password":"yadmin666","role":"ADMIN"})
 tok = a["data"]["token"]
 print("Login OK")
 

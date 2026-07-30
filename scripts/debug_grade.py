@@ -11,7 +11,7 @@ def req(method, path, body=None, token=None):
     conn.close()
     return d
 
-t = req("POST", "/api/auth/login", {"username":"teacher1","password":"teacher123","role":"TEACHER"})
+t = req("POST", "/api/auth/login", {"username":"yteacher1","password":"yteacher666","role":"TEACHER"})
 tok = t["data"]["token"]
 print("Login OK")
 

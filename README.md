@@ -114,11 +114,7 @@ Linux/macOS 可将虚拟环境路径替换为 `.venv/bin/python`，启动命令�
 
 ## Demo 账号
 
-| 角色 | 用户名 | 密码 |
-|------|--------|------|
-| 管理员 | admin | admin123 |
-| 教师 | teacher1 | teacher123 |
-| 学生 | student1 | student123 |
+执行 `python scripts/seed_demo_data.py` 可重置演示环境账号数据。脚本会清空现有账号及关联业务数据，只保留三类演示账号；登录首页不会展示演示账号，请由部署者仅向授权测试者单独提供。
 
 ## 项目结构
 
