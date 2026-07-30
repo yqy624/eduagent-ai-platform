@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.git/
+.gitignore
+*.md
+*.whl
+uploads/
+scripts/debug_*.py
+scripts/check_data.py

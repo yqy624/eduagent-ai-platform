@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: edu-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: a666666
+      MYSQL_DATABASE: student_db
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: edu-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8001
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: student_db
+      DB_USERNAME: root
+      DB_PASSWORD: a666666
+      JWT_SECRET: ChangeThisJwtSecretBeforeProductionUse_AtLeast32CharsLong
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: edu-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./static:/app/static:ro
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
