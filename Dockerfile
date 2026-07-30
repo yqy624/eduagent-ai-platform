@@ -3,8 +3,8 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # 安装 Python 依赖（仅核心包，不含大模型依赖）
-COPY requirements-deploy.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements-deploy.txt
+COPY requirements-deploy.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # 复制项目
 COPY . .
