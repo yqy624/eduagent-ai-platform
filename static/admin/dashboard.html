@@ -37,12 +37,15 @@
 <body class="page-shell" data-role="admin">
 <div class="dashboard-shell">
   <aside class="sidebar">
-    <div class="d-flex align-items-center gap-2 mb-4">
-      <div class="brand-mark"><i class="fa-solid fa-shield-halved"></i></div>
-      <div>
-        <div class="fw-bold">管理员工作台</div>
-        <div class="small text-white-50">系统与用户管理中心</div>
+    <div class="d-flex align-items-center justify-content-between gap-2 mb-4">
+      <div class="d-flex align-items-center gap-2">
+        <div class="brand-mark"><i class="fa-solid fa-shield-halved"></i></div>
+        <div>
+          <div class="fw-bold">管理员工作台</div>
+          <div class="small text-white-50">系统与用户管理中心</div>
+        </div>
       </div>
+      <button class="btn btn-sm text-white-50 d-lg-none" onclick="toggleSidebar()" style="font-size:20px;line-height:1;padding:0;border:none;background:none">&times;</button>
     </div>
     <div class="nav-item active" data-tab="dashboard"><i class="fa-solid fa-chart-line"></i> 概览</div>
     <div class="nav-item" data-tab="users"><i class="fa-solid fa-users"></i> 用户管理</div>
