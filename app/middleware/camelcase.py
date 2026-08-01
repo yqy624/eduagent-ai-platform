@@ -45,13 +45,18 @@ async def camelcase_middleware(request, call_next):
         data = json.loads(body)
         converted = convert_keys(data)
         new_body = json.dumps(converted, ensure_ascii=False).encode("utf-8")
+        status_code = response.status_code
+        if status_code < 400 and isinstance(data, dict):
+            code = data.get("code")
+            if isinstance(code, int) and code >= 400:
+                status_code = code
         
         # 构建新响应，去掉旧的 Content-Length（新版 body 长度不同）
         headers = dict(response.headers)
         headers.pop("content-length", None)
         return Response(
             content=new_body,
-            status_code=response.status_code,
+            status_code=status_code,
             headers=headers,
             media_type=response.media_type,
         )
