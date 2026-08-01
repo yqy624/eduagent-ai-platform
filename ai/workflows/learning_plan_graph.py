@@ -1,8 +1,10 @@
-"""学习路径规划 Agent — LangGraph 状态机"""
+"""Learning-plan Agent workflow."""
 import json
 from functools import partial
-from typing import Any, Dict, List, Optional, TypedDict, Literal
-from langgraph.graph import StateGraph, END
+from typing import Any, Dict, List, Optional, TypedDict
+
+from langgraph.graph import END, StateGraph
+
 from app.services.ai_tool_service import AiToolService
 
 
@@ -25,36 +27,75 @@ class LearningPlanState(TypedDict):
     error: Optional[str]
 
 
-# ===== 节点函数（通过 partial 注入 service） =====
-async def collect_profile(state: LearningPlanState, service: AiToolService) -> Dict:
+def _score_ratio(record: Dict[str, Any]) -> float:
+    score = float(record.get("score") or 0)
+    total = float(record.get("total_points") or 100)
+    return score / max(total, 1) * 100
+
+
+def _material_names(materials: Optional[List[Dict[str, Any]]]) -> List[str]:
+    names: List[str] = []
+    seen = set()
+    for item in materials or []:
+        source = str(item.get("source") or item.get("name") or "").strip()
+        if not source:
+            continue
+        chunk_count = item.get("chunk_count")
+        label = f"{source} ({chunk_count} chunks)" if chunk_count else source
+        if label not in seen:
+            seen.add(label)
+            names.append(label)
+    return names
+
+
+async def collect_profile(state: LearningPlanState, service: AiToolService) -> Dict[str, Any]:
     profile = await service.get_student_profile(state["student_id"])
     await service.log_tool_call_json(
-        state.get("run_id"), "collect_profile",
+        state.get("run_id"),
+        "collect_profile",
         {"student_id": state["student_id"]},
-        {"course_count": len(profile.get("courses", [])), "grade_count": len(profile.get("grades", []))},
+        {
+            "course_count": len(profile.get("courses", [])),
+            "grade_count": len(profile.get("grades", [])),
+        },
     )
     return {
         "profile": profile,
         "grades": profile.get("grades", []),
         "submissions": [],
-        "tool_trace": [{"node": "collect_profile", "result": f"获取到 {len(profile.get('courses', []))} 门课程, {len(profile.get('grades', []))} 条成绩"}],
+        "tool_trace": [
+            {
+                "node": "collect_profile",
+                "result": f"Loaded profile with {len(profile.get('grades', []))} grade records",
+            }
+        ],
     }
 
 
-async def analyze_weakness(state: LearningPlanState, service: AiToolService) -> Dict:
-    profile = state.get("profile", {})
+async def analyze_weakness(state: LearningPlanState, service: AiToolService) -> Dict[str, Any]:
+    profile = state.get("profile") or {}
     low_scores = profile.get("low_score_assignments", [])
     weakness_areas = []
-    for g in low_scores:
-        weakness_areas.append({
-            "assignment": g.get("assignment_title", "未知"),
-            "score": g.get("score"),
-            "total": g.get("total_points", 100),
-            "ratio": round(g["score"] / g["total_points"] * 100, 1) if g.get("total_points") else 0,
-            "level": "弱" if (g.get("score", 0) / max(g.get("total_points", 100), 1) * 100) < 60 else "中",
-        })
+    for record in low_scores:
+        ratio = round(_score_ratio(record), 1)
+        weakness_areas.append(
+            {
+                "assignment": record.get("assignment_title") or "Untitled assignment",
+                "score": record.get("score"),
+                "total": record.get("total_points") or 100,
+                "ratio": ratio,
+                "level": "high" if ratio < 60 else "medium",
+            }
+        )
+
     graded = [g for g in profile.get("grades", []) if g.get("score") is not None]
-    pass_count = sum(1 for g in graded if g["score"] / max(g.get("total_points", 100), 1) * 100 >= 60) if graded else 0
+    pass_count = sum(1 for g in graded if _score_ratio(g) >= 60)
+    summary = (
+        f"{len(graded)} graded assignments, {pass_count} passed, "
+        f"{len(graded) - pass_count} below passing threshold"
+        if graded
+        else "No graded assignment data is available yet"
+    )
     weakness = {
         "total_assignments": len(profile.get("grades", [])),
         "graded_count": len(graded),
@@ -62,123 +103,203 @@ async def analyze_weakness(state: LearningPlanState, service: AiToolService) -> 
         "fail_count": len(graded) - pass_count,
         "pass_rate": round(pass_count / len(graded) * 100, 1) if graded else 0,
         "weakness_areas": weakness_areas,
-        "summary": f"共 {len(profile.get('grades', []))} 项作业，已批改 {len(graded)} 项，通过 {pass_count} 项"
-        if graded else "暂无已批改成绩数据",
+        "summary": summary,
     }
     await service.log_tool_call_json(
-        state.get("run_id"), "analyze_weakness",
+        state.get("run_id"),
+        "analyze_weakness",
         {"grade_count": len(profile.get("grades", []))},
-        {"weakness_count": len(weakness_areas), "summary": weakness["summary"]},
+        {"weakness_count": len(weakness_areas), "summary": summary},
     )
     return {
         "weakness": weakness,
         "tool_trace": (state.get("tool_trace") or [])
-        + [{"node": "analyze_weakness", "result": f"找到 {len(weakness_areas)} 个薄弱点"}],
+        + [{"node": "analyze_weakness", "result": f"Found {len(weakness_areas)} weakness areas"}],
     }
 
 
-async def retrieve_materials(state: LearningPlanState, service: AiToolService) -> Dict:
+async def retrieve_materials(state: LearningPlanState, service: AiToolService) -> Dict[str, Any]:
     materials = await service.get_course_materials_summary(state["course_id"])
     await service.log_tool_call_json(
-        state.get("run_id"), "retrieve_materials",
+        state.get("run_id"),
+        "retrieve_materials",
         {"course_id": state["course_id"]},
         {"material_count": len(materials), "materials": materials[:5]},
     )
     return {
         "retrieved_materials": materials,
         "tool_trace": (state.get("tool_trace") or [])
-        + [{"node": "retrieve_materials", "result": f"找到 {len(materials)} 份课程资料"}],
+        + [{"node": "retrieve_materials", "result": f"Retrieved {len(materials)} course materials"}],
     }
 
 
-async def plan_tasks(state: LearningPlanState, service: AiToolService) -> Dict:
-    weakness = state.get("weakness", {})
+async def plan_tasks(state: LearningPlanState, service: AiToolService) -> Dict[str, Any]:
+    weakness = state.get("weakness") or {}
     weak_areas = weakness.get("weakness_areas", [])
+    materials = _material_names(state.get("retrieved_materials"))
+    days = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"]
     daily_tasks = []
-    days = ["周一", "周二", "周三", "周四", "周五"]
-    for i, day in enumerate(days[:max(len(weak_areas), 3)]):
-        if i < len(weak_areas):
-            wa = weak_areas[i]
-            task = {
-                "day": day, "focus": f"强化 {wa['assignment']}", "duration_hours": 2,
-                "priority": "高" if wa.get("ratio", 100) < 60 else "中",
-                "tasks": [f"复习 {wa['assignment']} 相关内容", "完成课后练习题", "整理错题笔记"],
-            }
+
+    task_count = max(len(weak_areas), 3)
+    for index, day in enumerate(days[:task_count]):
+        related_material = materials[index % len(materials)] if materials else None
+        if index < len(weak_areas):
+            area = weak_areas[index]
+            tasks = [
+                f"Review the concepts related to {area['assignment']}",
+                "Complete targeted practice and record wrong answers",
+                "Summarize the method and unresolved questions",
+            ]
+            if related_material:
+                tasks.insert(1, f"Use course material: {related_material}")
+            daily_tasks.append(
+                {
+                    "day": day,
+                    "focus": f"Strengthen {area['assignment']}",
+                    "duration_hours": 2,
+                    "priority": "high" if area.get("ratio", 100) < 60 else "medium",
+                    "tasks": tasks,
+                }
+            )
         else:
-            task = {"day": day, "focus": "综合复习", "duration_hours": 1.5, "priority": "中",
-                    "tasks": ["复习本周知识点", "完成综合练习题"]}
-        daily_tasks.append(task)
-    plan = {"daily_tasks": daily_tasks, "total_hours": sum(t["duration_hours"] for t in daily_tasks), "weakness_summary": weakness.get("summary", "")}
+            tasks = [
+                "Review this week's core concepts",
+                "Complete mixed practice",
+                "Update the error notebook",
+            ]
+            if related_material:
+                tasks.insert(1, f"Read and annotate: {related_material}")
+            daily_tasks.append(
+                {
+                    "day": day,
+                    "focus": "Comprehensive review",
+                    "duration_hours": 1.5,
+                    "priority": "medium",
+                    "tasks": tasks,
+                }
+            )
+
+    plan = {
+        "daily_tasks": daily_tasks,
+        "total_hours": sum(task["duration_hours"] for task in daily_tasks),
+        "weakness_summary": weakness.get("summary", ""),
+        "materials": materials,
+    }
     await service.log_tool_call_json(
-        state.get("run_id"), "plan_tasks",
-        {"weakness_count": len(weak_areas)},
-        {"daily_task_count": len(daily_tasks), "total_hours": plan["total_hours"]},
+        state.get("run_id"),
+        "plan_tasks",
+        {"weakness_count": len(weak_areas), "material_count": len(materials)},
+        {
+            "daily_task_count": len(daily_tasks),
+            "total_hours": plan["total_hours"],
+            "materials": materials,
+        },
     )
-    return {"plan": plan, "tool_trace": (state.get("tool_trace") or [])
-            + [{"node": "plan_tasks", "result": f"生成 {len(daily_tasks)} 天计划"}]}
+    return {
+        "plan": plan,
+        "tool_trace": (state.get("tool_trace") or [])
+        + [{"node": "plan_tasks", "result": f"Generated {len(daily_tasks)} daily tasks"}],
+    }
 
 
-async def generate_exercises(state: LearningPlanState, service: AiToolService) -> Dict:
-    weakness = state.get("weakness", {})
+async def generate_exercises(state: LearningPlanState, service: AiToolService) -> Dict[str, Any]:
+    weakness = state.get("weakness") or {}
     weak_areas = weakness.get("weakness_areas", [])
     exercises = []
-    for i, wa in enumerate(weak_areas[:3]):
-        exercises.append({"id": i + 1, "type": "简答题",
-            "question": f"请总结 {wa['assignment']} 的核心知识点，并举例说明",
-            "hint": "回顾课堂笔记和讲义", "target_weakness": wa["assignment"], "estimated_time_minutes": 15})
-        exercises.append({"id": i + 1 + len(weak_areas), "type": "综合题",
-            "question": f"基于 {wa['assignment']} 的内容，分析在实际应用中可能遇到的问题",
-            "hint": "结合课程案例思考", "target_weakness": wa["assignment"], "estimated_time_minutes": 20})
+    for index, area in enumerate(weak_areas[:3]):
+        exercises.append(
+            {
+                "id": index * 2 + 1,
+                "type": "short_answer",
+                "question": f"Summarize the core ideas of {area['assignment']} and give an example.",
+                "hint": "Use class notes and course materials.",
+                "target_weakness": area["assignment"],
+                "estimated_time_minutes": 15,
+            }
+        )
+        exercises.append(
+            {
+                "id": index * 2 + 2,
+                "type": "applied_analysis",
+                "question": f"Analyze a practical problem related to {area['assignment']}.",
+                "hint": "State assumptions, process, evidence, and conclusion.",
+                "target_weakness": area["assignment"],
+                "estimated_time_minutes": 20,
+            }
+        )
     await service.log_tool_call_json(
-        state.get("run_id"), "generate_exercises",
+        state.get("run_id"),
+        "generate_exercises",
         {"weakness_count": len(weak_areas)},
         {"exercise_count": len(exercises)},
     )
-    return {"exercises": exercises, "tool_trace": (state.get("tool_trace") or [])
-            + [{"node": "generate_exercises", "result": f"生成 {len(exercises)} 道练习题"}]}
+    return {
+        "exercises": exercises,
+        "tool_trace": (state.get("tool_trace") or [])
+        + [{"node": "generate_exercises", "result": f"Generated {len(exercises)} exercises"}],
+    }
 
 
-async def validate_plan(state: LearningPlanState, service: AiToolService) -> Dict:
-    plan = state.get("plan", {})
+async def validate_plan(state: LearningPlanState, service: AiToolService) -> Dict[str, Any]:
+    plan = state.get("plan") or {}
     errors = []
-    total_hours = plan.get("total_hours", 0)
-    if total_hours > 20: errors.append(f"总时长 {total_hours}h 超过建议值")
-    if total_hours <= 0: errors.append("学习计划为空")
-    if not plan.get("daily_tasks"): errors.append("缺少每日任务")
+    total_hours = float(plan.get("total_hours") or 0)
+    if total_hours > 20:
+        errors.append(f"Total study time {total_hours}h exceeds recommended workload")
+    if total_hours <= 0:
+        errors.append("Learning plan is empty")
+    if not plan.get("daily_tasks"):
+        errors.append("Missing daily tasks")
     await service.log_tool_call_json(
-        state.get("run_id"), "validate_plan",
+        state.get("run_id"),
+        "validate_plan",
         {"total_hours": total_hours, "daily_task_count": len(plan.get("daily_tasks") or [])},
         {"errors": errors},
     )
-    return {"validation_errors": errors, "tool_trace": (state.get("tool_trace") or [])
-            + [{"node": "validate_plan", "result": f"校验完成，发现 {len(errors)} 个问题"}]}
+    return {
+        "validation_errors": errors,
+        "tool_trace": (state.get("tool_trace") or [])
+        + [{"node": "validate_plan", "result": f"Validation found {len(errors)} issues"}],
+    }
 
 
-async def save_report(state: LearningPlanState, service: AiToolService) -> Dict:
+async def save_report(state: LearningPlanState, service: AiToolService) -> Dict[str, Any]:
     try:
+        plan = state.get("plan") or {}
         report = await service.save_learning_report(
-            student_id=state["student_id"], course_id=state["course_id"], run_id=state.get("run_id", 0),
+            student_id=state["student_id"],
+            course_id=state["course_id"],
+            run_id=state.get("run_id", 0),
             weakness_json=json.dumps(state.get("weakness", {}), ensure_ascii=False),
-            plan_json=json.dumps(state.get("plan", {}), ensure_ascii=False))
+            plan_json=json.dumps(plan, ensure_ascii=False),
+        )
         await service.log_tool_call_json(
-            state.get("run_id"), "save_report",
+            state.get("run_id"),
+            "save_report",
             {"student_id": state["student_id"], "course_id": state["course_id"]},
             {"report_id": report.id},
         )
-        final_report = {"report_id": report.id, "weakness": state.get("weakness", {}),
-                        "plan": state.get("plan", {}), "exercises": state.get("exercises", []),
-                        "validation_errors": state.get("validation_errors", [])}
-        return {"final_report": final_report, "tool_trace": (state.get("tool_trace") or [])
-                + [{"node": "save_report", "result": f"报告已保存 ID={report.id}"}]}
-    except Exception as e:
-        return {"error": str(e)}
+        final_report = {
+            "report_id": report.id,
+            "weakness": state.get("weakness", {}),
+            "plan": plan,
+            "materials": plan.get("materials", []),
+            "exercises": state.get("exercises", []),
+            "validation_errors": state.get("validation_errors", []),
+        }
+        return {
+            "final_report": final_report,
+            "tool_trace": (state.get("tool_trace") or [])
+            + [{"node": "save_report", "result": f"Report saved with ID={report.id}"}],
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 def should_generate_exercises(state: LearningPlanState) -> str:
     return "generate_exercises" if state.get("weakness", {}).get("weakness_areas") else "validate_plan"
 
 
-# ===== 通过 partial 绑定 service =====
 def build_learning_plan_graph(service: AiToolService):
     workflow = StateGraph(LearningPlanState)
     workflow.add_node("collect_profile", partial(collect_profile, service=service))
@@ -193,8 +314,11 @@ def build_learning_plan_graph(service: AiToolService):
     workflow.add_edge("collect_profile", "analyze_weakness")
     workflow.add_edge("analyze_weakness", "retrieve_materials")
     workflow.add_edge("retrieve_materials", "plan_tasks")
-    workflow.add_conditional_edges("plan_tasks", should_generate_exercises, {
-        "generate_exercises": "generate_exercises", "validate_plan": "validate_plan"})
+    workflow.add_conditional_edges(
+        "plan_tasks",
+        should_generate_exercises,
+        {"generate_exercises": "generate_exercises", "validate_plan": "validate_plan"},
+    )
     workflow.add_edge("generate_exercises", "validate_plan")
     workflow.add_edge("validate_plan", "save_report")
     workflow.add_edge("save_report", END)
