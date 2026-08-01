@@ -1,6 +1,7 @@
 """AI 路由 — RAG 问答、学情诊断、学习计划、批改建议"""
 import json
 import time
+from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -28,6 +29,7 @@ from app.schemas.common import ApiResponse
 from app.services.teacher_service import TeacherService
 from app.services.ai_tool_service import AiToolService
 from ai.llm import get_llm
+from ai.agents.runtime import AgentRuntime
 from ai.rag.loader import DocumentLoader, TextSplitter
 from ai.rag.vector_store import VectorStoreManager
 from ai.workflows.learning_plan_graph import build_learning_plan_graph, LearningPlanState
@@ -63,6 +65,11 @@ async def _ensure_student_ai_access(
     user: User,
     course_id: Optional[int] = None,
 ) -> None:
+    student_result = await db.execute(
+        select(User.id).where(User.id == student_id, User.role == "STUDENT")
+    )
+    if student_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
     if user.role == "ADMIN":
         return
     if user.role == "STUDENT":
@@ -301,8 +308,10 @@ async def _collect_agent_memory(
 ) -> List[Dict[str, Any]]:
     """读取当前用户最近的对话，作为跨请求的长期记忆。"""
     filters = [AiQaLog.user_id == user.id]
-    if course_id:
-        filters.append(AiQaLog.course_id.in_([0, course_id]))
+    if course_id is not None:
+        filters.append(AiQaLog.course_id == course_id)
+    else:
+        filters.append(AiQaLog.course_id == 0)
     result = await db.execute(
         select(AiQaLog)
         .where(*filters)
@@ -915,7 +924,7 @@ async def course_qa(
         return ApiResponse.error(message=f"AI 问答失败: {str(e)}", code=500)
 
 
-@router.post("/agent/chat")
+@router.post("/agent/chat-legacy", include_in_schema=False)
 async def agent_chat(
     req: AgentChatRequest,
     user: User = Depends(get_current_user),
@@ -1066,6 +1075,59 @@ async def agent_chat(
         latency = int((time.time() - start) * 1000)
         await service.fail_run(run.id, error=str(e), latency_ms=latency)
         return ApiResponse.error(message=f"Agent 对话失败: {str(e)}", code=500)
+
+
+@router.post("/agent/chat")
+async def agent_runtime_chat(
+    req: AgentChatRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Execute a bounded Agent: planning, tools, memory, and synthesis."""
+    question = req.question.strip()
+    session_id = req.session_id or str(uuid4())
+    runtime = None
+    service = AiToolService(db)
+    try:
+        runtime = AgentRuntime(
+            db=db,
+            user=user,
+            service=service,
+            retrieve_materials=lambda selected_course_id, material_question: (
+                _search_course_chunks(db, selected_course_id, material_question)
+            ),
+        )
+        result = await runtime.run(
+            question=question,
+            course_id=req.course_id,
+            mode=req.mode,
+            session_id=session_id,
+            confirm=req.confirm,
+        )
+        memory = result.get("memory") or {}
+        return ApiResponse.ok(
+            data=AgentChatResponse(
+                answer=result["answer"],
+                mode=req.mode,
+                citations=result.get("citations", []),
+                confidence=result.get("confidence", 0.0),
+                run_id=result.get("run_id"),
+                memory_count=memory.get("used_count", 0),
+                status=result.get("status", "COMPLETED"),
+                plan=result.get("plan", {}),
+                executed_steps=result.get("executed_steps", []),
+                requires_confirmation=result.get("requires_confirmation", []),
+                memory=memory,
+                confirmation_required=result.get("confirmation_required", False),
+            )
+        )
+    except Exception as exc:
+        if runtime is not None and runtime.active_run_id is not None:
+            await service.fail_run(
+                runtime.active_run_id,
+                error=str(exc),
+            )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Agent runtime failed: {exc}")
 
 
 @router.post("/students/{student_id}/diagnosis")

@@ -25,20 +25,35 @@ class Base(DeclarativeBase):
 
 
 async def ensure_runtime_schema() -> None:
+    import app.models.models  # noqa: F401
+    import app.models.ai_models  # noqa: F401
+
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
         has_assignments = await conn.run_sync(
             lambda sync_conn: inspect(sync_conn).has_table("assignments")
         )
-        if not has_assignments:
-            return
-        columns = await conn.run_sync(
+        if has_assignments:
+            columns = await conn.run_sync(
+                lambda sync_conn: {
+                    column["name"]
+                    for column in inspect(sync_conn).get_columns("assignments")
+                }
+            )
+            if "detail" not in columns:
+                await conn.execute(text("ALTER TABLE assignments ADD COLUMN detail TEXT NULL"))
+
+        ai_runs_columns = await conn.run_sync(
             lambda sync_conn: {
                 column["name"]
-                for column in inspect(sync_conn).get_columns("assignments")
+                for column in inspect(sync_conn).get_columns("ai_runs")
             }
+            if inspect(sync_conn).has_table("ai_runs")
+            else set()
         )
-        if "detail" not in columns:
-            await conn.execute(text("ALTER TABLE assignments ADD COLUMN detail TEXT NULL"))
+        if ai_runs_columns and "plan_json" not in ai_runs_columns:
+            await conn.execute(text("ALTER TABLE ai_runs ADD COLUMN plan_json TEXT NULL"))
 
 
 async def get_db() -> AsyncSession:

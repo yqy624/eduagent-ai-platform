@@ -36,6 +36,8 @@ class AgentChatRequest(BaseModel):
         default="other",
         pattern="^(course_material|assignment_submission|teaching_advice|other)$",
     )
+    session_id: Optional[str] = Field(default=None, max_length=100)
+    confirm: bool = False
 
 
 class AgentChatResponse(BaseModel):
@@ -46,6 +48,12 @@ class AgentChatResponse(BaseModel):
     confidence: float = 0.0
     run_id: Optional[int] = None
     memory_count: int = 0
+    status: str = "COMPLETED"
+    plan: Dict[str, Any] = {}
+    executed_steps: List[Dict[str, Any]] = []
+    requires_confirmation: List[Dict[str, Any]] = []
+    memory: Dict[str, Any] = {}
+    confirmation_required: bool = False
 
 
 class DiagnosisResponse(BaseModel):

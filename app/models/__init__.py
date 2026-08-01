@@ -13,6 +13,17 @@ from app.models.models import (
     TeacherCommentMemory,
     TeacherCommentUsageHistory,
 )
+from app.models.ai_models import (
+    AiDocumentChunk,
+    AiIndexJob,
+    AiRun,
+    AiToolCall,
+    AiAgentMemory,
+    AiQaLog,
+    AiLearningReport,
+    AiGradingSuggestion,
+    AiEvalResult,
+)
 
 __all__ = [
     "User",
@@ -28,4 +39,13 @@ __all__ = [
     "StoredFile",
     "TeacherCommentMemory",
     "TeacherCommentUsageHistory",
+    "AiDocumentChunk",
+    "AiIndexJob",
+    "AiRun",
+    "AiToolCall",
+    "AiAgentMemory",
+    "AiQaLog",
+    "AiLearningReport",
+    "AiGradingSuggestion",
+    "AiEvalResult",
 ]

@@ -62,6 +62,28 @@ class AiToolService:
             run.finished_at = datetime.now()
             await self.db.flush()
 
+    async def update_run_plan(self, run_id: int, plan: Dict[str, Any]) -> None:
+        result = await self.db.execute(select(AiRun).where(AiRun.id == run_id))
+        run = result.scalar_one_or_none()
+        if run:
+            run.plan_json = json.dumps(plan, ensure_ascii=False, default=str)
+            await self.db.flush()
+
+    async def update_run_status(
+        self,
+        run_id: int,
+        status: str,
+        output_summary: Optional[str] = None,
+    ) -> None:
+        result = await self.db.execute(select(AiRun).where(AiRun.id == run_id))
+        run = result.scalar_one_or_none()
+        if run:
+            run.status = status
+            if output_summary is not None:
+                run.output_summary = output_summary
+            run.finished_at = datetime.now()
+            await self.db.flush()
+
     async def fail_run(self, run_id: int, error: str, latency_ms: int = 0):
         result = await self.db.execute(select(AiRun).where(AiRun.id == run_id))
         run = result.scalar_one_or_none()
@@ -194,6 +216,11 @@ class AiToolService:
             "status": run.status,
             "input_summary": run.input_summary,
             "output_summary": run.output_summary,
+            "plan": (
+                json.loads(run.plan_json)
+                if run.plan_json
+                else None
+            ),
             "latency_ms": run.latency_ms,
             "token_usage": run.token_usage,
             "error": run.error,

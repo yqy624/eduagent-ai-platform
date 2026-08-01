@@ -66,6 +66,7 @@ class AiRun(Base):
     )  # RUNNING, COMPLETED, FAILED, CANCELLED
     input_summary: Mapped[Optional[str]] = mapped_column(Text)
     output_summary: Mapped[Optional[str]] = mapped_column(Text)
+    plan_json: Mapped[Optional[str]] = mapped_column(Text)
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     token_usage: Mapped[Optional[int]] = mapped_column(Integer)
     error: Mapped[Optional[str]] = mapped_column(Text)
@@ -86,6 +87,24 @@ class AiToolCall(Base):
     output_json: Mapped[Optional[str]] = mapped_column(Text)
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+
+class AiAgentMemory(Base):
+    """Durable memory used by the controlled Agent runtime."""
+    __tablename__ = "ai_agent_memories"
+    __table_args__ = (
+        Index("idx_ai_memory_user_session", "user_id", "session_id"),
+        Index("idx_ai_memory_user_course", "user_id", "course_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    course_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    session_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    memory_type: Mapped[str] = mapped_column(String(30), default="interaction")
+    content_json: Mapped[str] = mapped_column(Text, nullable=False)
+    importance: Mapped[float] = mapped_column(Float, default=0.5)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
 
