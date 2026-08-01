@@ -30,6 +30,13 @@
     .ai-chat-message.assistant .ai-chat-bubble{background:var(--bg-soft)}
     .ai-chat-meta{font-size:11px;color:var(--text-muted)}
     .ai-chat-citations{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px}
+    .ai-session-list{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto}
+    .ai-session-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--border);border-radius:8px;background:var(--bg-soft);padding:10px}
+    .ai-session-open{border:0;background:transparent;color:var(--text-main);padding:0;text-align:left;min-width:0}
+    .ai-session-title{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ai-session-meta{font-size:12px;color:var(--text-muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ai-session-actions{display:flex;gap:6px}
+    .ai-session-actions .btn{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center}
     .teacher-ai-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
     .teacher-ai-status-card{border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);padding:12px}
     .teacher-ai-status-card strong{display:block;color:var(--text-main);font-size:18px;line-height:1.1}
@@ -289,10 +296,16 @@ var quickCommentCategory = 'all';
 var analysisChartIds = [];
 var teacherAiMode = localStorage.getItem("teacherAiMode") || "course_material";
 var teacherAiMessages = readTeacherAiMessages();
+var teacherAiSessions = readTeacherAiSessions();
+var teacherAiSessionId = localStorage.getItem("teacherAiSessionId") ||
+  ("teacher_" + Date.now() + "_" + Math.random().toString(36).slice(2));
+localStorage.setItem("teacherAiSessionId", teacherAiSessionId);
 var teacherAiModeLabels = {
   course_material: "课程资料",
   assignment_submission: "作业提交",
+  learning_analysis: "教学数据诊断",
   teaching_advice: "教学建议",
+  campus_faq: "平台操作咨询",
   other: "其他问题"
 };
 function readTeacherAiMessages() {
@@ -305,6 +318,33 @@ function readTeacherAiMessages() {
 }
 function saveTeacherAiMessages() {
   localStorage.setItem("teacherAiMessages", JSON.stringify(teacherAiMessages.slice(-30)));
+}
+function readTeacherAiSessions() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("teacherAiSessions") || "[]");
+    return Array.isArray(saved) ? saved.slice(0, 20) : [];
+  } catch (err) {
+    return [];
+  }
+}
+function saveTeacherAiSessions() {
+  localStorage.setItem("teacherAiSessions", JSON.stringify(teacherAiSessions.slice(0, 20)));
+}
+function getTeacherAiCourseName(courseId) {
+  var id = Number(courseId || 0);
+  var course = teacherCourses.find(function(item) { return Number(item.id) === id; });
+  return course ? (course.name || "未命名课程") : "未选择课程";
+}
+function makeTeacherAiSessionTitle(messages) {
+  var firstQuestion = (messages || []).find(function(item) { return item.role === "user" && item.text; });
+  var title = firstQuestion ? firstQuestion.text.trim() : "AI 对话";
+  return title.length > 24 ? title.slice(0, 24) + "..." : title;
+}
+function formatTeacherAiSessionTime(value) {
+  if (!value) return "";
+  var date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 function setTeacherAiMode(mode) {
   teacherAiMode = teacherAiModeLabels[mode] ? mode : "other";
@@ -322,6 +362,24 @@ function renderTeacherAiCitations(citations) {
         Number(c.similarity || c.score || 0).toFixed(2) + '</div>';
     }).join("") + '</div>';
 }
+function renderTeacherAiTrace(item, messageIndex) {
+  if (!item || item.role !== "assistant" || !item.plan) return "";
+  var steps = item.executedSteps || item.executed_steps || [];
+  var planSteps = (item.plan.steps || []).map(function(step) {
+    return step.tool || "unknown";
+  }).join(" -> ");
+  var trace = steps.map(function(step) {
+    return '<div>' + App.escapeHtml(step.tool || "tool") + '：' +
+      App.escapeHtml(step.status || "UNKNOWN") +
+      (step.error ? '（' + App.escapeHtml(step.error) + '）' : '') + '</div>';
+  }).join("");
+  return '<div class="small text-muted border-top mt-2 pt-2">' +
+    '<div>Agent 计划：' + App.escapeHtml(planSteps || "无") + '</div>' +
+    (trace ? '<div>执行轨迹：' + trace + '</div>' : '') +
+    (item.memory && item.memory.used_count != null ? '<div>记忆命中：' + item.memory.used_count + '</div>' : '') +
+    (item.confirmationRequired && item.request ? '<button type="button" class="btn btn-outline-warning btn-sm mt-2" onclick="confirmTeacherAgent(' + messageIndex + ')"><i class="fa-solid fa-check me-1"></i>确认执行</button>' : '') +
+    '</div>';
+}
 function renderTeacherAiChat() {
   var history = document.getElementById("teacherAiChatHistory");
   if (!history) return;
@@ -329,13 +387,107 @@ function renderTeacherAiChat() {
     history.innerHTML = '<div class="text-muted small">选择问题分类后开始对话。助手会结合课程资料和教学数据持续理解当前上下文。</div>';
     return;
   }
-  history.innerHTML = teacherAiMessages.map(function(item) {
+  history.innerHTML = teacherAiMessages.map(function(item, index) {
     var roleLabel = item.role === "user" ? "我" : "助手";
     return '<div class="ai-chat-message ' + (item.role === "user" ? "user" : "assistant") + '">' +
       '<div class="ai-chat-meta">' + roleLabel + (item.mode ? ' · ' + App.escapeHtml(teacherAiModeLabels[item.mode] || item.mode) : '') + '</div>' +
-      '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderTeacherAiCitations(item.citations) + '</div></div>';
+       '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderTeacherAiCitations(item.citations) + renderTeacherAiTrace(item, index) + '</div></div>';
   }).join("");
   history.scrollTop = history.scrollHeight;
+}
+function renderTeacherAiSessions() {
+  var list = document.getElementById("teacherAiSessionList");
+  if (!list) return;
+  if (!teacherAiSessions.length) {
+    list.innerHTML = '<div class="text-muted small">结束当前对话后，会话包会出现在这里，后续可以重新打开或下载备份。</div>';
+    return;
+  }
+  list.innerHTML = teacherAiSessions.map(function(session) {
+    var modeText = teacherAiModeLabels[session.mode] || session.mode || "对话";
+    var meta = (session.courseName || "未选择课程") + " · " + modeText + " · " +
+      (session.messageCount || (session.messages || []).length) + " 条";
+    return '<div class="ai-session-item">' +
+      '<button type="button" class="ai-session-open" data-id="' + App.escapeAttr(session.id) + '" onclick="openTeacherAiSession(this.dataset.id)" title="打开会话">' +
+        '<div class="ai-session-title">' + App.escapeHtml(session.title || "AI 对话") + '</div>' +
+        '<div class="ai-session-meta">' + App.escapeHtml(formatTeacherAiSessionTime(session.endedAt) + " · " + meta) + '</div>' +
+      '</button>' +
+      '<div class="ai-session-actions">' +
+        '<button type="button" class="btn btn-outline-secondary btn-sm" data-id="' + App.escapeAttr(session.id) + '" onclick="downloadTeacherAiSession(this.dataset.id)" title="下载会话包"><i class="fa-solid fa-download"></i></button>' +
+        '<button type="button" class="btn btn-outline-danger btn-sm" data-id="' + App.escapeAttr(session.id) + '" onclick="deleteTeacherAiSession(this.dataset.id)" title="删除会话"><i class="fa-solid fa-trash"></i></button>' +
+      '</div>' +
+    '</div>';
+  }).join("");
+}
+function endTeacherAiSession() {
+  if (!teacherAiMessages.length) {
+    App.showToast("当前没有可结束的对话", "warning");
+    return;
+  }
+  var courseEl = document.getElementById("teacherAiCourse");
+  var courseId = courseEl && courseEl.value ? Number(courseEl.value) : null;
+  var now = new Date().toISOString();
+  var messages = teacherAiMessages.map(function(item) { return Object.assign({}, item); });
+  var session = {
+    id: "session_" + Date.now() + "_" + Math.random().toString(36).slice(2),
+    agentSessionId: teacherAiSessionId,
+    title: makeTeacherAiSessionTitle(messages),
+    courseId: courseId,
+    courseName: getTeacherAiCourseName(courseId),
+    mode: teacherAiMode,
+    createdAt: messages[0] && messages[0].createdAt ? messages[0].createdAt : now,
+    endedAt: now,
+    messageCount: messages.length,
+    messages: messages
+  };
+  teacherAiSessions.unshift(session);
+  teacherAiSessions = teacherAiSessions.slice(0, 20);
+  saveTeacherAiSessions();
+  teacherAiMessages = [];
+  teacherAiSessionId = "teacher_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+  localStorage.setItem("teacherAiSessionId", teacherAiSessionId);
+  saveTeacherAiMessages();
+  renderTeacherAiChat();
+  renderTeacherAiSessions();
+  var countEl = document.getElementById("teacherAiHistoryCount");
+  if (countEl) countEl.textContent = teacherAiSessions.length;
+  App.showToast("对话已结束并保存到历史会话");
+}
+function openTeacherAiSession(sessionId) {
+  var session = teacherAiSessions.find(function(item) { return item.id === sessionId; });
+  if (!session) return;
+  if (session.mode) setTeacherAiMode(session.mode);
+  var courseEl = document.getElementById("teacherAiCourse");
+  if (courseEl && session.courseId) courseEl.value = String(session.courseId);
+  teacherAiMessages = (session.messages || []).map(function(item) { return Object.assign({}, item); }).slice(-30);
+  if (session.agentSessionId) {
+    teacherAiSessionId = session.agentSessionId;
+    localStorage.setItem("teacherAiSessionId", teacherAiSessionId);
+  }
+  saveTeacherAiMessages();
+  renderTeacherAiChat();
+  App.showToast("已打开历史会话");
+}
+function downloadTeacherAiSession(sessionId) {
+  var session = teacherAiSessions.find(function(item) { return item.id === sessionId; });
+  if (!session) return;
+  var blob = new Blob([JSON.stringify(session, null, 2)], { type: "application/json;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement("a");
+  link.href = url;
+  link.download = (session.title || "eduagent-session").replace(/[\\/:*?"<>|]/g, "_") + ".json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+function deleteTeacherAiSession(sessionId) {
+  if (!window.confirm("确定删除这条历史会话吗？")) return;
+  teacherAiSessions = teacherAiSessions.filter(function(item) { return item.id !== sessionId; });
+  saveTeacherAiSessions();
+  renderTeacherAiSessions();
+  var countEl = document.getElementById("teacherAiHistoryCount");
+  if (countEl) countEl.textContent = teacherAiSessions.length;
+  App.showToast("历史会话已删除");
 }
 function hasEcharts() {
   return typeof window.echarts !== "undefined";
@@ -947,6 +1099,7 @@ async function loadTeacherAiAgent() {
   box.innerHTML = '<div class="section-head"><h5 class="mb-0">AI Agent</h5><span class="metric-muted">知识库索引、教学数据与校园问答</span></div><div class="text-muted small">加载中...</div>';
   try {
     var courses = await api("/teacher/courses");
+    teacherCourses = courses;
     var options = courses.length ? courses.map(function(c) {
       return '<option value="' + c.id + '">' + App.escapeHtml(c.name || '未命名课程') + '</option>';
     }).join('') : '<option value="">暂无课程</option>';
@@ -965,6 +1118,7 @@ async function loadTeacherAiAgent() {
           '<div class="teacher-ai-status-grid">' +
             '<div class="teacher-ai-status-card"><strong>' + courses.length + '</strong><span>可用课程</span></div>' +
             '<div class="teacher-ai-status-card"><strong>' + teacherAiMessages.length + '</strong><span>当前对话消息</span></div>' +
+            '<div class="teacher-ai-status-card"><strong id="teacherAiHistoryCount">' + teacherAiSessions.length + '</strong><span>历史会话</span></div>' +
             '<div class="teacher-ai-status-card"><strong>' + (courses.length ? '可执行' : '待建课') + '</strong><span>资料索引状态</span></div>' +
           '</div>' +
           '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="indexTeacherCourseDocs()" ' + (!courses.length ? 'disabled' : '') + '><i class="fa-solid fa-database me-1"></i>索引课程资料</button></div>' +
@@ -974,10 +1128,13 @@ async function loadTeacherAiAgent() {
             }).join("") +
           '</div>' +
           '<label class="form-label" for="teacherAiQuestion">对话内容</label><textarea id="teacherAiQuestion" class="form-control mb-2" rows="3" placeholder="先选择问题分类，再输入你的问题"></textarea>' +
-          '<button class="btn btn-outline-primary btn-sm mb-3" onclick="askTeacherCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>发送</button>' +
+          '<div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary btn-sm" onclick="askTeacherCourseQa()"><i class="fa-solid fa-paper-plane me-1"></i>发送</button><button class="btn btn-outline-secondary btn-sm" onclick="endTeacherAiSession()"><i class="fa-solid fa-box-archive me-1"></i>结束对话</button></div>' +
           '<div id="teacherAiChatHistory" class="ai-chat-history"></div>' +
         '</div>' +
         '<div class="section-surface">' +
+          '<div class="d-flex align-items-center justify-content-between gap-2 mb-2"><div class="fw-semibold">历史会话</div><span class="badge-soft bg-primary bg-opacity-10 text-primary">本机保存</span></div>' +
+          '<div class="small text-muted mb-3">结束当前对话后，会话包会保存到这里，后续可以打开继续查看，也可以下载 JSON 备份。</div>' +
+          '<div class="ai-session-list mb-3" id="teacherAiSessionList"></div>' +
           '<div class="fw-semibold mb-2">当前对话</div>' +
           '<div class="small text-muted">分类会直接决定助手使用的回答范围；历史对话会用于理解课程教学目标和你的工作偏好。</div>' +
           '<div class="fw-semibold mt-3 mb-2">建议提问</div>' +
@@ -995,6 +1152,7 @@ async function loadTeacherAiAgent() {
         '</div>' +
       '</div>';
     renderTeacherAiChat();
+    renderTeacherAiSessions();
   } catch (err) {
     box.innerHTML = renderEmptyPanel('AI Agent 加载失败', err.message || '暂时无法加载 AI 功能。', false, '重新加载', 'loadTeacherAiAgent()', 'fa-rotate');
   }
@@ -1019,7 +1177,7 @@ async function indexTeacherCourseDocs() {
         return (item.name || '文件') + '：' + (item.status || '-') + '，chunks ' + (item.chunkCount || item.chunk_count || 0);
       }).join('\n');
     }
-    teacherAiMessages.push({ role: "assistant", text: summary, mode: "course_material" });
+    teacherAiMessages.push({ role: "assistant", text: summary, mode: "course_material", createdAt: new Date().toISOString() });
     saveTeacherAiMessages();
     renderTeacherAiChat();
   } catch (err) {
@@ -1038,14 +1196,40 @@ async function askTeacherCourseQa() {
   var resultBox = document.getElementById("teacherAiChatHistory");
   resultBox.innerHTML = '<div class="text-muted small">正在回复...</div>';
   try {
-    var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: teacherAiMode });
-    teacherAiMessages.push({ role: "user", text: question, mode: teacherAiMode });
-    teacherAiMessages.push({ role: "assistant", text: data.answer || "", mode: teacherAiMode, citations: data.citations || [] });
+    var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: teacherAiMode, session_id: teacherAiSessionId });
+    var now = new Date().toISOString();
+    teacherAiMessages.push({ role: "user", text: question, mode: teacherAiMode, createdAt: now });
+    teacherAiMessages.push({ role: "assistant", text: data.answer || "", mode: teacherAiMode, citations: data.citations || [], plan: data.plan || {}, executedSteps: data.executedSteps || data.executed_steps || [], memory: data.memory || {}, status: data.status, confirmationRequired: data.confirmationRequired || data.confirmation_required || false, request: { question: question, courseId: courseId, mode: teacherAiMode, sessionId: teacherAiSessionId }, createdAt: new Date().toISOString() });
     saveTeacherAiMessages();
     document.getElementById("teacherAiQuestion").value = "";
     renderTeacherAiChat();
   } catch (err) {
     resultBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '问答失败') + '</span>';
+  }
+}
+
+async function confirmTeacherAgent(messageIndex) {
+  var item = teacherAiMessages[messageIndex];
+  if (!item || !item.request) return;
+  try {
+    var data = await api('/ai/agent/chat', 'POST', {
+      question: item.request.question,
+      course_id: item.request.courseId,
+      mode: item.request.mode,
+      session_id: item.request.sessionId,
+      confirm: true
+    });
+    item.text = data.answer || "";
+    item.citations = data.citations || [];
+    item.plan = data.plan || {};
+    item.executedSteps = data.executedSteps || data.executed_steps || [];
+    item.memory = data.memory || {};
+    item.status = data.status;
+    item.confirmationRequired = data.confirmationRequired || data.confirmation_required || false;
+    saveTeacherAiMessages();
+    renderTeacherAiChat();
+  } catch (err) {
+    App.showToast(err.message || "确认执行失败", "danger");
   }
 }
 

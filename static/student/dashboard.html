@@ -282,6 +282,9 @@ var studentAiCourses = [];
 var studentAiMode = localStorage.getItem("studentAiMode") || "course_material";
 var studentAiMessages = readStudentAiMessages();
 var studentAiSessions = readStudentAiSessions();
+var studentAiSessionId = localStorage.getItem("studentAiSessionId") ||
+  ("student_" + Date.now() + "_" + Math.random().toString(36).slice(2));
+localStorage.setItem("studentAiSessionId", studentAiSessionId);
 var studentAiModeLabels = {
   course_material: "课程资料",
   assignment_submission: "作业提交",
@@ -342,6 +345,24 @@ function renderStudentAiCitations(citations) {
         Number(c.similarity || c.score || 0).toFixed(2) + '</div>';
     }).join("") + '</div>';
 }
+function renderStudentAiTrace(item, messageIndex) {
+  if (!item || item.role !== "assistant" || !item.plan) return "";
+  var steps = item.executedSteps || item.executed_steps || [];
+  var planSteps = (item.plan.steps || []).map(function(step) {
+    return step.tool || "unknown";
+  }).join(" -> ");
+  var trace = steps.map(function(step) {
+    var status = step.status || "UNKNOWN";
+    return '<div>' + App.escapeHtml(step.tool || "tool") + '：' +
+      App.escapeHtml(status) + (step.error ? '（' + App.escapeHtml(step.error) + '）' : '') + '</div>';
+  }).join("");
+  return '<div class="small text-muted border-top mt-2 pt-2">' +
+    '<div>Agent 计划：' + App.escapeHtml(planSteps || "无") + '</div>' +
+    (trace ? '<div>执行轨迹：' + trace + '</div>' : '') +
+    (item.memory && item.memory.used_count != null ? '<div>记忆命中：' + item.memory.used_count + '</div>' : '') +
+    (item.confirmationRequired && item.request ? '<button type="button" class="btn btn-outline-warning btn-sm mt-2" onclick="confirmStudentAgent(' + messageIndex + ')"><i class="fa-solid fa-check me-1"></i>确认执行</button>' : '') +
+    '</div>';
+}
 function renderStudentAiChat() {
   var history = document.getElementById("studentAiChatHistory");
   if (!history) return;
@@ -349,11 +370,11 @@ function renderStudentAiChat() {
     history.innerHTML = '<div class="text-muted small">从上面的分类开始提问，助手会记住本次浏览器中的对话，并结合账户历史继续回答。</div>';
     return;
   }
-  history.innerHTML = studentAiMessages.map(function(item) {
+  history.innerHTML = studentAiMessages.map(function(item, index) {
     var roleLabel = item.role === "user" ? "我" : "助手";
     return '<div class="ai-chat-message ' + (item.role === "user" ? "user" : "assistant") + '">' +
       '<div class="ai-chat-meta">' + roleLabel + (item.mode ? ' · ' + App.escapeHtml(studentAiModeLabels[item.mode] || item.mode) : '') + '</div>' +
-      '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderStudentAiCitations(item.citations) + '</div></div>';
+       '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderStudentAiCitations(item.citations) + renderStudentAiTrace(item, index) + '</div></div>';
   }).join("");
   history.scrollTop = history.scrollHeight;
 }
@@ -403,6 +424,8 @@ function endStudentAiSession() {
   studentAiSessions = studentAiSessions.slice(0, 20);
   saveStudentAiSessions();
   studentAiMessages = [];
+  studentAiSessionId = "student_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+  localStorage.setItem("studentAiSessionId", studentAiSessionId);
   saveStudentAiMessages();
   renderStudentAiChat();
   renderStudentAiSessions();
@@ -1054,15 +1077,40 @@ async function askStudentCourseQa() {
   var answerBox = document.getElementById("studentAiChatHistory");
   answerBox.innerHTML = '<div class="text-muted small">正在回复...</div>';
   try {
-    var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: studentAiMode });
+    var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: studentAiMode, session_id: studentAiSessionId });
     var now = new Date().toISOString();
     studentAiMessages.push({ role: "user", text: question, mode: studentAiMode, createdAt: now });
-    studentAiMessages.push({ role: "assistant", text: data.answer || "", mode: studentAiMode, citations: data.citations || [], createdAt: new Date().toISOString() });
+    studentAiMessages.push({ role: "assistant", text: data.answer || "", mode: studentAiMode, citations: data.citations || [], plan: data.plan || {}, executedSteps: data.executedSteps || data.executed_steps || [], memory: data.memory || {}, status: data.status, confirmationRequired: data.confirmationRequired || data.confirmation_required || false, request: { question: question, courseId: courseId, mode: studentAiMode, sessionId: studentAiSessionId }, createdAt: new Date().toISOString() });
     saveStudentAiMessages();
     document.getElementById("studentAiQuestion").value = "";
     renderStudentAiChat();
   } catch (err) {
     answerBox.innerHTML = '<span class="text-danger">' + App.escapeHtml(err.message || '问答失败') + '</span>';
+  }
+}
+
+async function confirmStudentAgent(messageIndex) {
+  var item = studentAiMessages[messageIndex];
+  if (!item || !item.request) return;
+  try {
+    var data = await api('/ai/agent/chat', 'POST', {
+      question: item.request.question,
+      course_id: item.request.courseId,
+      mode: item.request.mode,
+      session_id: item.request.sessionId,
+      confirm: true
+    });
+    item.text = data.answer || "";
+    item.citations = data.citations || [];
+    item.plan = data.plan || {};
+    item.executedSteps = data.executedSteps || data.executed_steps || [];
+    item.memory = data.memory || {};
+    item.status = data.status;
+    item.confirmationRequired = data.confirmationRequired || data.confirmation_required || false;
+    saveStudentAiMessages();
+    renderStudentAiChat();
+  } catch (err) {
+    App.showToast(err.message || "确认执行失败", "danger");
   }
 }
 
