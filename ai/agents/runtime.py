@@ -86,8 +86,18 @@ class AgentRuntime:
         )
         assignment_intent = any(
             word in text
-            for word in ("作业", "任务", "截止", "待办", "assignment", "deadline")
-        )
+            for word in (
+                "作业", "任务", "截止", "待办", "提交", "交了", "交了吗",
+                "assignment", "deadline", "submit", "submission",
+            )
+        ) or mode == "assignment_submission"
+        submission_intent = any(
+            word in text
+            for word in (
+                "提交", "交了", "交了吗", "未交", "没交", "没提交", "已交",
+                "已提交", "submit", "submission", "submitted", "missing",
+            )
+        ) or mode == "assignment_submission"
         grade_intent = any(
             word in text
             for word in ("成绩", "分数", "低分", "薄弱", "grade", "score", "weak")
@@ -113,6 +123,16 @@ class AgentRuntime:
                     args={"course_id": course_id},
                 )
             )
+        if submission_intent and self.user.role == "STUDENT":
+            args = {"course_id": course_id} if course_id else {}
+            if not any(step.tool == "get_my_submissions" for step in steps):
+                steps.append(
+                    AgentPlanStep(
+                        tool="get_my_submissions",
+                        reason="Read explicit per-assignment submission status for the current student.",
+                        args=args,
+                    )
+                )
         if (grade_intent or plan_intent) and self.user.role in {"ADMIN", "TEACHER"} and course_id:
             steps.append(
                 AgentPlanStep(
@@ -167,6 +187,19 @@ class AgentRuntime:
         memory: List[Dict[str, Any]],
     ) -> tuple[AgentPlan, str]:
         tool_catalog = self.registry.specs()
+        # 启发式计划能识别明确意图时直接采用，避免慢速 LLM planner
+        # （本地 8B 模型生成 JSON 计划需数分钟，业务查询毫秒级即可完成）
+        heuristic = await self._heuristic_plan(question, course_id, mode)
+        has_intent = any(
+            step.tool != "get_course_overview" for step in heuristic.steps
+        )
+        if has_intent:
+            return heuristic, "heuristic_intent"
+        if mode == "assignment_submission":
+            return (
+                await self._heuristic_plan(question, course_id, mode),
+                "heuristic_assignment_submission",
+            )
         prompt = f"""You are the planning model inside a controlled education Agent.
 Return JSON only with this shape:
 {{"objective":"...", "steps":[{{"tool":"registered tool name","reason":"...","args":{{}}}}]}}
@@ -218,6 +251,7 @@ TOOL_CATALOG: {json.dumps(tool_catalog, ensure_ascii=False)}
         if course_id is not None and "course_id" not in args:
             if step.tool in {
                 "get_course_assignments",
+                "get_my_submissions",
                 "retrieve_course_material",
                 "analyze_learning_gaps",
                 "generate_learning_plan",
@@ -235,10 +269,22 @@ TOOL_CATALOG: {json.dumps(tool_catalog, ensure_ascii=False)}
         execution: List[Dict[str, Any]],
         memory: List[Dict[str, Any]],
     ) -> tuple[str, str]:
+        direct_submission_answer = self._direct_submission_answer(question, execution)
+        if direct_submission_answer is not None:
+            return direct_submission_answer, "deterministic_submission_status"
+        direct_assignment_answer = self._direct_assignment_requirements_answer(
+            question, execution
+        )
+        if direct_assignment_answer is not None:
+            return direct_assignment_answer, "deterministic_assignment_requirements"
+
         prompt = f"""You are the answer model for EduAgent.
 Answer in Chinese unless the user asks otherwise. Be concise and actionable.
 Use only the execution results and memory below. State when data is missing.
 Do not claim an action happened if its step failed or is awaiting confirmation.
+For submission questions, use assignment_statuses/not_submitted_assignments first.
+NOT_SUBMITTED means the current student has no submission record for that assignment;
+never infer that an assignment was submitted just because it is absent from submissions.
 USER: {question}
             PLAN: {json.dumps(plan.model_dump(), ensure_ascii=False, default=str)}
 EXECUTION: {json.dumps(execution, ensure_ascii=False, default=str)[:16000]}
@@ -275,6 +321,124 @@ MEMORY: {json.dumps(memory[-6:], ensure_ascii=False, default=str)}
                         f"{item['tool']} 返回 {json.dumps(output, ensure_ascii=False)[:600]}"
                     )
             return "\n".join(fragments), "fallback"
+
+    def _direct_assignment_requirements_answer(
+        self,
+        question: str,
+        execution: List[Dict[str, Any]],
+    ) -> Optional[str]:
+        """作业要求类问题直接格式化最近作业，跳过慢速 LLM synthesis。"""
+        normalized_question = re.sub(r"\s+", "", question.lower())
+        asks_requirement = any(
+            word in normalized_question
+            for word in ("作业要求", "作业的内容", "作业内容", "要求是什么", "作业是什么", "作业是")
+        )
+        asks_latest = any(
+            word in normalized_question
+            for word in ("最新", "最近", "新布置", "刚布置", "新发布", "刚发布")
+        )
+        if not (asks_requirement or asks_latest):
+            return None
+
+        assignments: List[Dict[str, Any]] = []
+        for trace in execution:
+            if trace.get("status") != "COMPLETED":
+                continue
+            output = trace.get("output") or {}
+            if trace.get("tool") == "get_course_assignments":
+                assignments.extend(output.get("assignments") or [])
+
+        if not assignments:
+            return None
+
+        latest = max(
+            assignments,
+            key=lambda item: item.get("id") or 0,
+        )
+        title = latest.get("title") or "未命名作业"
+        description = (latest.get("description") or "暂无要求").strip()
+        detail = (latest.get("detail") or "").strip()
+        due_date = latest.get("due_date") or "未设置"
+        total_points = latest.get("total_points")
+        points_text = str(total_points) if total_points is not None else "未设置"
+        lines = [
+            f"该课程最新发布的作业是《{title}》",
+            f"作业要求：{description}",
+        ]
+        if detail:
+            lines.append(f"作业详情：{detail}")
+        lines.append(f"截止时间：{due_date}")
+        lines.append(f"总分：{points_text}")
+        return "\n".join(lines)
+
+    def _direct_submission_answer(
+        self,
+        question: str,
+        execution: List[Dict[str, Any]],
+    ) -> Optional[str]:
+        statuses: List[Dict[str, Any]] = []
+        for trace in execution:
+            if trace.get("status") != "COMPLETED":
+                continue
+            output = trace.get("output") or {}
+            statuses.extend(output.get("assignment_statuses") or [])
+            for assignment in output.get("assignments") or []:
+                if "submission_status" in assignment:
+                    statuses.append(assignment)
+        if not statuses:
+            return None
+
+        deduped: Dict[tuple[Any, Any], Dict[str, Any]] = {}
+        for item in statuses:
+            key = (item.get("course_id"), item.get("assignment_id") or item.get("id"))
+            deduped[key] = item
+        statuses = list(deduped.values())
+
+        normalized_question = re.sub(r"\s+", "", question.lower())
+        matched = [
+            item
+            for item in statuses
+            if item.get("title")
+            and re.sub(r"\s+", "", str(item["title"]).lower()) in normalized_question
+        ]
+        if matched:
+            item = max(matched, key=lambda value: len(str(value.get("title") or "")))
+            return self._format_single_submission_answer(item)
+
+        asks_missing = any(
+            word in normalized_question
+            for word in ("未交", "没交", "没提交", "待提交", "missing")
+        )
+        asks_all_done = any(
+            word in normalized_question
+            for word in ("都交", "全部交", "所有作业", "allsubmitted")
+        )
+        if asks_missing or asks_all_done:
+            missing = [
+                item
+                for item in statuses
+                if item.get("submission_status") == "NOT_SUBMITTED"
+            ]
+            if not missing:
+                return "当前可见作业都已有提交记录。"
+            titles = "、".join(f"《{item.get('title', '未命名作业')}》" for item in missing)
+            return f"还有 {len(missing)} 项作业没有提交：{titles}。"
+        return None
+
+    def _format_single_submission_answer(self, item: Dict[str, Any]) -> str:
+        title = item.get("title") or "这项作业"
+        status = item.get("submission_status") or item.get("status")
+        if status == "NOT_SUBMITTED":
+            return f"《{title}》还没有提交，当前没有你的提交记录。"
+        if status == "GRADED":
+            score = item.get("score")
+            score_text = f"，分数是 {score}" if score is not None else ""
+            return f"《{title}》已经提交并已批改{score_text}。"
+        if status == "SUBMITTED":
+            submitted_at = item.get("submitted_at")
+            time_text = f"，提交时间：{submitted_at}" if submitted_at else ""
+            return f"《{title}》已经提交，当前等待批改{time_text}。"
+        return f"《{title}》当前提交状态是 {status or '未知'}。"
 
     async def run(
         self,

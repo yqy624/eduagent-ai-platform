@@ -145,25 +145,36 @@ class AgentToolRegistry:
     async def _get_course_assignments(self, args: Dict[str, Any]) -> Dict[str, Any]:
         course_id = int(args["course_id"])
         await self._ensure_course_access(course_id)
-        rows = await self.db.execute(
-            select(Assignment)
-            .where(Assignment.course_id == course_id)
-            .order_by(Assignment.due_date.asc(), Assignment.id.desc())
-            .limit(20)
-        )
+        if self.user.role == "STUDENT":
+            rows = await self.db.execute(
+                select(Assignment, Submission)
+                .outerjoin(
+                    Submission,
+                    (Submission.assignment_id == Assignment.id)
+                    & (Submission.student_id == self.user.id),
+                )
+                .where(Assignment.course_id == course_id)
+                .order_by(Assignment.due_date.asc(), Assignment.id.desc())
+                .limit(20)
+            )
+            assignments = [
+                self._assignment_status_payload(assignment, submission)
+                for assignment, submission in rows
+            ]
+        else:
+            rows = await self.db.execute(
+                select(Assignment)
+                .where(Assignment.course_id == course_id)
+                .order_by(Assignment.due_date.asc(), Assignment.id.desc())
+                .limit(20)
+            )
+            assignments = [
+                self._assignment_payload(assignment)
+                for assignment in rows.scalars().all()
+            ]
         return {
             "course_id": course_id,
-            "assignments": [
-                {
-                    "id": a.id,
-                    "title": a.title,
-                    "description": a.description,
-                    "detail": a.detail,
-                    "due_date": a.due_date.isoformat() if a.due_date else None,
-                    "total_points": a.total_points,
-                }
-                for a in rows.scalars().all()
-            ],
+            "assignments": assignments,
         }
 
     async def _get_my_grades(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -198,29 +209,86 @@ class AgentToolRegistry:
         if self.user.role != "STUDENT":
             raise AgentToolError("get_my_submissions is currently available to students")
         course_id = args.get("course_id")
-        query = select(Submission, Assignment).join(
-            Assignment, Assignment.id == Submission.assignment_id
-        ).where(Submission.student_id == self.user.id)
+        query = (
+            select(Assignment, Course, Submission)
+            .join(Course, Course.id == Assignment.course_id)
+            .join(Enrollment, Enrollment.course_id == Course.id)
+            .outerjoin(
+                Submission,
+                (Submission.assignment_id == Assignment.id)
+                & (Submission.student_id == self.user.id),
+            )
+            .where(Enrollment.student_id == self.user.id)
+        )
         if course_id is not None:
             await self._ensure_course_access(int(course_id))
             query = query.where(Assignment.course_id == int(course_id))
-        rows = await self.db.execute(query.order_by(Submission.id.desc()).limit(30))
+        rows = await self.db.execute(
+            query.order_by(Assignment.due_date.asc(), Assignment.id.desc()).limit(50)
+        )
+        assignment_statuses = [
+            {
+                **self._assignment_status_payload(assignment, submission),
+                "course_id": course.id,
+                "course_name": course.name,
+            }
+            for assignment, course, submission in rows
+        ]
+        submitted = [
+            item
+            for item in assignment_statuses
+            if item["submission_status"] in {"SUBMITTED", "GRADED"}
+        ]
+        not_submitted = [
+            item
+            for item in assignment_statuses
+            if item["submission_status"] == "NOT_SUBMITTED"
+        ]
         return {
-            "submissions": [
-                {
-                    "id": submission.id,
-                    "assignment_id": assignment.id,
-                    "title": assignment.title,
-                    "status": submission.status,
-                    "score": submission.score,
-                    "submitted_at": (
-                        submission.submitted_at.isoformat()
-                        if submission.submitted_at
-                        else None
-                    ),
-                }
-                for submission, assignment in rows
-            ]
+            "course_id": int(course_id) if course_id is not None else None,
+            "assignment_statuses": assignment_statuses,
+            "submissions": submitted,
+            "not_submitted_assignments": not_submitted,
+            "submitted_count": len(submitted),
+            "not_submitted_count": len(not_submitted),
+            "total_assignment_count": len(assignment_statuses),
+        }
+
+    def _assignment_payload(self, assignment: Assignment) -> Dict[str, Any]:
+        return {
+            "id": assignment.id,
+            "title": assignment.title,
+            "description": assignment.description,
+            "detail": assignment.detail,
+            "due_date": assignment.due_date.isoformat()
+            if assignment.due_date
+            else None,
+            "total_points": assignment.total_points,
+        }
+
+    def _assignment_status_payload(
+        self,
+        assignment: Assignment,
+        submission: Optional[Submission],
+    ) -> Dict[str, Any]:
+        status = submission.status if submission else "NOT_SUBMITTED"
+        return {
+            **self._assignment_payload(assignment),
+            "assignment_id": assignment.id,
+            "submission_id": submission.id if submission else None,
+            "submission_status": status,
+            "status": status,
+            "score": submission.score if submission else None,
+            "submitted_at": (
+                submission.submitted_at.isoformat()
+                if submission and submission.submitted_at
+                else None
+            ),
+            "graded_at": (
+                submission.graded_at.isoformat()
+                if submission and submission.graded_at
+                else None
+            ),
         }
 
     async def _retrieve_materials(self, args: Dict[str, Any]) -> Dict[str, Any]:

@@ -121,6 +121,16 @@ window.App = (function () {
       .replace(/'/g, "&#39;");
   }
 
+  // 清理 AI 回答中的 markdown 装饰符号，仅保留面对客户的纯文本。
+  // 计划/执行轨迹/引用等内部信息由后端日志记录，不展示在前端。
+  function cleanAiText(value) {
+    return String(value == null ? "" : value)
+      .replace(/\*\*([^*]+)\*\*/g, "$1") // **加粗** -> 加粗
+      .replace(/`([^`]+)`/g, "$1") // `代码` -> 代码
+      .replace(/\*([^*\n]+)\*/g, "$1") // *斜体* -> 斜体
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1"); // [链接](url) -> 链接
+  }
+
   function escapeAttr(value) {
     return escapeHtml(value);
   }
@@ -337,6 +347,7 @@ window.App = (function () {
     fmtTime: fmtTime,
     escapeHtml: escapeHtml,
     escapeAttr: escapeAttr,
+    cleanAiText: cleanAiText,
     timeAgo: timeAgo,
     request: request,
     initNotifications: initNotifications,

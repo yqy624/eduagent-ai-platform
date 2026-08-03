@@ -337,30 +337,15 @@ function setStudentAiMode(mode) {
   });
 }
 function renderStudentAiCitations(citations) {
-  if (!citations || !citations.length) return "";
-  return '<div class="ai-chat-citations"><div class="fw-semibold mb-1">课程资料引用</div>' +
-    citations.map(function(c) {
-      return '<div>' + App.escapeHtml(c.source || "课程资料") + ' · chunk ' +
-        (c.chunkIndex != null ? c.chunkIndex : c.chunk_index || 0) + ' · 相似度 ' +
-        Number(c.similarity || c.score || 0).toFixed(2) + '</div>';
-    }).join("") + '</div>';
+  // 引用来源由后端日志记录，仅后端可查，前端不展示
+  return "";
 }
 function renderStudentAiTrace(item, messageIndex) {
-  if (!item || item.role !== "assistant" || !item.plan) return "";
-  var steps = item.executedSteps || item.executed_steps || [];
-  var planSteps = (item.plan.steps || []).map(function(step) {
-    return step.tool || "unknown";
-  }).join(" -> ");
-  var trace = steps.map(function(step) {
-    var status = step.status || "UNKNOWN";
-    return '<div>' + App.escapeHtml(step.tool || "tool") + '：' +
-      App.escapeHtml(status) + (step.error ? '（' + App.escapeHtml(step.error) + '）' : '') + '</div>';
-  }).join("");
+  if (!item || item.role !== "assistant") return "";
+  // 计划/执行轨迹/记忆命中由后端日志记录，仅后端可查，前端只保留确认操作
+  if (!(item.confirmationRequired && item.request)) return "";
   return '<div class="small text-muted border-top mt-2 pt-2">' +
-    '<div>Agent 计划：' + App.escapeHtml(planSteps || "无") + '</div>' +
-    (trace ? '<div>执行轨迹：' + trace + '</div>' : '') +
-    (item.memory && item.memory.used_count != null ? '<div>记忆命中：' + item.memory.used_count + '</div>' : '') +
-    (item.confirmationRequired && item.request ? '<button type="button" class="btn btn-outline-warning btn-sm mt-2" onclick="confirmStudentAgent(' + messageIndex + ')"><i class="fa-solid fa-check me-1"></i>确认执行</button>' : '') +
+    '<button type="button" class="btn btn-outline-warning btn-sm mt-2" onclick="confirmStudentAgent(' + messageIndex + ')"><i class="fa-solid fa-check me-1"></i>确认执行</button>' +
     '</div>';
 }
 function renderStudentAiChat() {
@@ -374,7 +359,7 @@ function renderStudentAiChat() {
     var roleLabel = item.role === "user" ? "我" : "助手";
     return '<div class="ai-chat-message ' + (item.role === "user" ? "user" : "assistant") + '">' +
       '<div class="ai-chat-meta">' + roleLabel + (item.mode ? ' · ' + App.escapeHtml(studentAiModeLabels[item.mode] || item.mode) : '') + '</div>' +
-       '<div class="ai-chat-bubble">' + App.escapeHtml(item.text || "") + renderStudentAiCitations(item.citations) + renderStudentAiTrace(item, index) + '</div></div>';
+       '<div class="ai-chat-bubble">' + App.escapeHtml(App.cleanAiText(item.text || "")) + renderStudentAiCitations(item.citations) + renderStudentAiTrace(item, index) + '</div></div>';
   }).join("");
   history.scrollTop = history.scrollHeight;
 }
@@ -1080,7 +1065,7 @@ async function askStudentCourseQa() {
     var data = await api('/ai/agent/chat', 'POST', { question: question, course_id: courseId, mode: studentAiMode, session_id: studentAiSessionId });
     var now = new Date().toISOString();
     studentAiMessages.push({ role: "user", text: question, mode: studentAiMode, createdAt: now });
-    studentAiMessages.push({ role: "assistant", text: data.answer || "", mode: studentAiMode, citations: data.citations || [], plan: data.plan || {}, executedSteps: data.executedSteps || data.executed_steps || [], memory: data.memory || {}, status: data.status, confirmationRequired: data.confirmationRequired || data.confirmation_required || false, request: { question: question, courseId: courseId, mode: studentAiMode, sessionId: studentAiSessionId }, createdAt: new Date().toISOString() });
+    studentAiMessages.push({ role: "assistant", text: data.answer || "", mode: studentAiMode, status: data.status, confirmationRequired: data.confirmationRequired || data.confirmation_required || false, request: { question: question, courseId: courseId, mode: studentAiMode, sessionId: studentAiSessionId }, createdAt: new Date().toISOString() });
     saveStudentAiMessages();
     document.getElementById("studentAiQuestion").value = "";
     renderStudentAiChat();
@@ -1101,10 +1086,6 @@ async function confirmStudentAgent(messageIndex) {
       confirm: true
     });
     item.text = data.answer || "";
-    item.citations = data.citations || [];
-    item.plan = data.plan || {};
-    item.executedSteps = data.executedSteps || data.executed_steps || [];
-    item.memory = data.memory || {};
     item.status = data.status;
     item.confirmationRequired = data.confirmationRequired || data.confirmation_required || false;
     saveStudentAiMessages();
