@@ -1,0 +1,7 @@
+# 2GB 服务器内存优化: 限制 EduAgent MySQL 内存(不修改仓库代码)
+services:
+  mysql:
+    command:
+      - --innodb-buffer-pool-size=64M
+      - --performance-schema=OFF
+      - --max-connections=50
