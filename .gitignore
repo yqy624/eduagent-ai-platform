@@ -37,3 +37,12 @@ chroma/
 .DS_Store
 Thumbs.db
 *.whl
+
+# 本地部署/运维脚本(含服务器凭据, 禁止入库)
+scripts/ssh_run.py
+scripts/ssh_retry.py
+scripts/sftp_put.py
+scripts/deploy_push.py
+scripts/gen_interview_doc.py
+deploy/collab-doc.env
+deploy/collab-doc.override.yml
