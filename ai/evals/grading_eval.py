@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.database import async_session_factory
 from app.models.models import Submission, Assignment
 from app.models.ai_models import AiEvalResult
-from ai.workflows.grading_graph import analyze_submission_for_grading
+from ai.workflows.grading_chain import analyze_submission_for_grading
 
 
 async def run_grading_eval():

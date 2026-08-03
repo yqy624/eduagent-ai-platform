@@ -52,7 +52,7 @@ print(f"回答预览: {answer[:200]}...")
 
 # === Agent 2: 学情诊断 + 学习路径 ===
 print("\n" + "─" * 60)
-print("🎯 [Agent 2] 学情诊断 + 学习路径 (LangGraph)")
+print("🎯 [Agent 2] 学情诊断 + 学习路径 (LangChain)")
 print("─" * 60)
 
 print("\n[2a] 学情诊断...")
@@ -63,7 +63,7 @@ if diag["code"] == 200:
     print(f"  薄弱点: {d['weakness']}")
     print(f"  证据: {d['evidence']}")
 
-print("\n[2b] 学习路径（LangGraph Agent）...")
+print("\n[2b] 学习路径（LangChain Agent）...")
 plan = req("POST", "/api/ai/students/4/learning-plan?course_id=4", token=tch_tok)
 print(f"状态: {plan['code']}")
 if plan["code"] == 200:

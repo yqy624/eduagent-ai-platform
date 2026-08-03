@@ -1,6 +1,6 @@
 # EduAgent — 基于多 Agent 的智慧教育学习运营平台
 
-> 在原有智慧教育管理系统基础上，将 Java 后端迁移为 Python FastAPI，并引入 LangGraph 多 Agent 工作流，
+> 在原有智慧教育管理系统基础上，将 Java 后端迁移为 Python FastAPI，并引入 LangChain 多 Agent 工作流，
 > 从「记录课程、作业、成绩」升级为「基于课程资料和学习行为进行诊断、答疑、规划、批改和教学建议生成」。
 
 ## 项目定位
@@ -31,7 +31,7 @@ EduAgent 当前定位为 **AI 教育平台 Preview / MVP**：它已经具备可�
 | 数据库 | MySQL 8.0（原 student_db） | 业务数据持久化 |
 | 缓存 | Redis | 会话与缓存 |
 | 认证 | JWT（兼容原前端） | 无状态认证 |
-| AI 编排 | LangGraph | 多 Agent 状态机 |
+| AI 编排 | LangChain | Runnable 链与多 Agent 工具编排 |
 | AI 组件 | LangChain | LLM 调用与工具集成 |
 | 向量库 | Chroma / FAISS | 课程资料语义检索 |
 | LLM | OpenAI / 通义千问 / Claude | 可切换的大语言模型 |
@@ -46,7 +46,7 @@ EduAgent 当前定位为 **AI 教育平台 Preview / MVP**：它已经具备可�
 ### 2. 学情诊断与学习路径规划 Agent
 - 读取学生课程、作业、提交、成绩、互评记录
 - 识别薄弱点，生成一周学习计划 + 推荐练习
-- LangGraph 状态机：collect_profile → analyze_weakness → retrieve_materials → plan_tasks → generate_exercises → validate_plan → save_report
+- LangChain Runnable 链：collect_profile → analyze_weakness → retrieve_materials → plan_tasks → generate_exercises → validate_plan → save_report
 
 ### 3. 教师批改与讲评 Agent
 - AI 根据题目要求、学生答案、评分标准给出建议分数和评语
@@ -141,7 +141,7 @@ edu-ai-platform/
 │   ├── prompts.py          # 提示词模板
 │   ├── rag/                # RAG 模块
 │   ├── tools/              # Agent 工具
-│   ├── workflows/          # LangGraph 工作流
+│   ├── workflows/          # LangChain Runnable 工作流
 │   └── evals/              # 评测
 ├── scripts/                # 工具脚本
 ├── static/                 # 前端静态文件
@@ -202,7 +202,7 @@ User Input → [收集画像] → [薄弱分析] → [检索资料] → [规划�
 
 - **State**: user_id, role, course_id, profile, grades, submissions, weakness, plan, exercises
 - **Tool**: 查成绩、查作业、查提交、检索课程资料、生成练习
-- **Memory**: 短期 LangGraph State，长期 ai_learning_reports
+- **Memory**: 短期 LangChain Runnable 状态，长期 ai_learning_reports
 - **Fallback**: LLM 不可用时返回基于规则的学习建议
 
 ### 教师批改 Agent

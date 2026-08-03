@@ -1,10 +1,9 @@
-"""Teacher grading-suggestion Agent workflow."""
+"""Teacher grading-suggestion Agent workflow implemented with LangChain runnables."""
 import json
 import re
-from functools import partial
 from typing import Any, Dict, List, Literal, Optional, TypedDict
 
-from langgraph.graph import END, StateGraph
+from langchain_core.runnables import RunnableBranch, RunnableLambda
 
 from app.services.ai_tool_service import AiToolService
 
@@ -551,22 +550,26 @@ def should_generate_comment(state: GradingState) -> Literal["generate_comment", 
     return "wait_for_review" if state.get("error") else "generate_comment"
 
 
-def build_grading_graph(service: AiToolService):
-    workflow = StateGraph(GradingState)
-    workflow.add_node("load_submission", partial(load_submission, service=service))
-    workflow.add_node("get_rubric", partial(get_rubric, service=service))
-    workflow.add_node("suggest_grade", partial(suggest_grade, service=service))
-    workflow.add_node("generate_comment", partial(generate_comment, service=service))
-    workflow.add_node("wait_for_review", partial(wait_for_review, service=service))
+def _merge_state(updater):
+    """Run one async workflow step and merge its updates into the state."""
 
-    workflow.set_entry_point("load_submission")
-    workflow.add_edge("load_submission", "get_rubric")
-    workflow.add_edge("get_rubric", "suggest_grade")
-    workflow.add_conditional_edges(
-        "suggest_grade",
-        should_generate_comment,
-        {"generate_comment": "generate_comment", "wait_for_review": "wait_for_review"},
+    async def invoke(state: GradingState) -> GradingState:
+        updates = await updater(state)
+        return {**state, **updates}
+
+    return RunnableLambda(invoke)
+
+
+def build_grading_chain(service: AiToolService):
+    """Build the workflow as a LangChain RunnableSequence with one branch."""
+    load = _merge_state(lambda state: load_submission(state, service))
+    rubric = _merge_state(lambda state: get_rubric(state, service))
+    suggest = _merge_state(lambda state: suggest_grade(state, service))
+    comment = _merge_state(lambda state: generate_comment(state, service))
+    review = _merge_state(lambda state: wait_for_review(state, service))
+
+    conditional = RunnableBranch(
+        (lambda state: should_generate_comment(state) == "generate_comment", comment | review),
+        review,
     )
-    workflow.add_edge("generate_comment", "wait_for_review")
-    workflow.add_edge("wait_for_review", END)
-    return workflow.compile()
+    return load | rubric | suggest | conditional

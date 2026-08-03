@@ -52,7 +52,6 @@ REQUIRED_PACKAGES = {
 OPTIONAL_PACKAGES = {
     "redis": "redis",
     "langchain": "langchain",
-    "langgraph": "langgraph",
     "chromadb": "chromadb",
     "sentence_transformers": "sentence-transformers",
 }

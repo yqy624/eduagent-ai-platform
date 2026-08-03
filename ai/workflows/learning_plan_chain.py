@@ -1,9 +1,8 @@
-"""Learning-plan Agent workflow."""
+"""Learning-plan Agent workflow implemented with LangChain runnables."""
 import json
-from functools import partial
 from typing import Any, Dict, List, Optional, TypedDict
 
-from langgraph.graph import END, StateGraph
+from langchain_core.runnables import RunnableBranch, RunnableLambda
 
 from app.services.ai_tool_service import AiToolService
 
@@ -300,26 +299,28 @@ def should_generate_exercises(state: LearningPlanState) -> str:
     return "generate_exercises" if state.get("weakness", {}).get("weakness_areas") else "validate_plan"
 
 
-def build_learning_plan_graph(service: AiToolService):
-    workflow = StateGraph(LearningPlanState)
-    workflow.add_node("collect_profile", partial(collect_profile, service=service))
-    workflow.add_node("analyze_weakness", partial(analyze_weakness, service=service))
-    workflow.add_node("retrieve_materials", partial(retrieve_materials, service=service))
-    workflow.add_node("plan_tasks", partial(plan_tasks, service=service))
-    workflow.add_node("generate_exercises", partial(generate_exercises, service=service))
-    workflow.add_node("validate_plan", partial(validate_plan, service=service))
-    workflow.add_node("save_report", partial(save_report, service=service))
+def _merge_state(updater):
+    """Run one async workflow step and merge its updates into the state."""
 
-    workflow.set_entry_point("collect_profile")
-    workflow.add_edge("collect_profile", "analyze_weakness")
-    workflow.add_edge("analyze_weakness", "retrieve_materials")
-    workflow.add_edge("retrieve_materials", "plan_tasks")
-    workflow.add_conditional_edges(
-        "plan_tasks",
-        should_generate_exercises,
-        {"generate_exercises": "generate_exercises", "validate_plan": "validate_plan"},
+    async def invoke(state: LearningPlanState) -> LearningPlanState:
+        updates = await updater(state)
+        return {**state, **updates}
+
+    return RunnableLambda(invoke)
+
+
+def build_learning_plan_chain(service: AiToolService):
+    """Build the workflow as a LangChain RunnableSequence with one branch."""
+    collect = _merge_state(lambda state: collect_profile(state, service))
+    analyze = _merge_state(lambda state: analyze_weakness(state, service))
+    retrieve = _merge_state(lambda state: retrieve_materials(state, service))
+    plan = _merge_state(lambda state: plan_tasks(state, service))
+    exercises = _merge_state(lambda state: generate_exercises(state, service))
+    validate = _merge_state(lambda state: validate_plan(state, service))
+    save = _merge_state(lambda state: save_report(state, service))
+
+    conditional = RunnableBranch(
+        (lambda state: should_generate_exercises(state) == "generate_exercises", exercises | validate),
+        validate,
     )
-    workflow.add_edge("generate_exercises", "validate_plan")
-    workflow.add_edge("validate_plan", "save_report")
-    workflow.add_edge("save_report", END)
-    return workflow.compile()
+    return collect | analyze | retrieve | plan | conditional | save

@@ -32,8 +32,8 @@ from ai.llm import get_llm
 from ai.agents.runtime import AgentRuntime
 from ai.rag.loader import DocumentLoader, TextSplitter
 from ai.rag.vector_store import VectorStoreManager
-from ai.workflows.learning_plan_graph import build_learning_plan_graph, LearningPlanState
-from ai.workflows.grading_graph import build_grading_graph, GradingState
+from ai.workflows.learning_plan_chain import build_learning_plan_chain, LearningPlanState
+from ai.workflows.grading_chain import build_grading_chain, GradingState
 
 router = APIRouter(prefix="/api/ai", tags=["AI 智能助手"])
 
@@ -1179,7 +1179,7 @@ async def generate_learning_plan(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """生成学习计划（LangGraph Agent）"""
+    """生成学习计划（LangChain Agent）"""
     await _ensure_student_ai_access(db, student_id, user, course_id)
     service = AiToolService(db)
     start = time.time()
@@ -1194,7 +1194,7 @@ async def generate_learning_plan(
         )
 
         # 构建 Agent 并执行
-        graph = build_learning_plan_graph(service)
+        chain = build_learning_plan_chain(service)
 
         initial_state: LearningPlanState = {
             "run_id": run.id,
@@ -1215,8 +1215,8 @@ async def generate_learning_plan(
             "error": None,
         }
 
-        # 执行 Graph
-        result = await graph.ainvoke(initial_state)
+        # 执行 LangChain workflow
+        result = await chain.ainvoke(initial_state)
 
         latency = int((time.time() - start) * 1000)
         token_usage = None
@@ -1283,7 +1283,7 @@ async def grade_suggestion(
     user: User = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),
 ):
-    """AI 批改建议（LangGraph Agent）"""
+    """AI 批改建议（LangChain Agent）"""
     await _ensure_teacher_submission_access(db, submission_id, user)
     service = AiToolService(db)
     start = time.time()
@@ -1298,7 +1298,7 @@ async def grade_suggestion(
         )
 
         # 构建 Agent 并执行
-        graph = build_grading_graph(service)
+        chain = build_grading_chain(service)
 
         initial_state: GradingState = {
             "run_id": run.id,
@@ -1322,7 +1322,7 @@ async def grade_suggestion(
             "error": None,
         }
 
-        result = await graph.ainvoke(initial_state)
+        result = await chain.ainvoke(initial_state)
 
         latency = int((time.time() - start) * 1000)
         error = result.get("error")
